@@ -146,15 +146,15 @@ def remove_team_member(
     return Messages.MEMBER_ADDED_TO_TEAM
 
 
-@router.put("/{team_id}/slack-webhook", response_model=TeamData)
-def set_slack_webhook(
+@router.put("/{team_id}/slack-bot-token", response_model=TeamData)
+def set_slack_bot_token(
     team_id: int,
-    webhook_update: SlackBotTokenUpdate,
+    token_update: SlackBotTokenUpdate,
     current_user: Annotated[UserInDB, Depends(get_current_active_user)],
     db: Session = Depends(get_db),
 ):
     """
-    Sets or updates the Slack webhook URL for a team.
+    Sets or updates the Slack bot token for a team.
     Only the team manager can configure this.
     """
     team = team_crud.get_team_by_id(db, team_id)
@@ -163,20 +163,20 @@ def set_slack_webhook(
 
     ensure_is_team_manager(team, current_user)
 
-    updated = team_crud.update_slack_webhook(db, team_id, webhook_update.slack_bot_token)
+    updated = team_crud.update_slack_bot_token(db, team_id, token_update.slack_bot_token)
     if updated is None:
         raise Errors.INVALID_PARAMS
     return updated
 
 
-@router.delete("/{team_id}/slack-webhook")
-def remove_slack_webhook(
+@router.delete("/{team_id}/slack-bot-token")
+def remove_slack_bot_token(
     team_id: int,
     current_user: Annotated[UserInDB, Depends(get_current_active_user)],
     db: Session = Depends(get_db),
 ):
     """
-    Removes the Slack webhook URL from a team (disables Slack reporting).
+    Removes the Slack bot token from a team (disables Slack integration).
     Only the team manager can do this.
     """
     team = team_crud.get_team_by_id(db, team_id)
@@ -185,8 +185,8 @@ def remove_slack_webhook(
 
     ensure_is_team_manager(team, current_user)
 
-    team_crud.update_slack_webhook(db, team_id, None)
-    return {"message": f"Slack webhook removed for team {team_id}."}
+    team_crud.update_slack_bot_token(db, team_id, None)
+    return {"message": f"Slack bot token removed for team {team_id}."}
 
 
 @router.get("/{team_id}/emotions", response_model=AllEmotionsResponse)

@@ -534,3 +534,54 @@ def test_build_unreachable_notification_blocks():
     assert "a@b.com" in text
     assert "c@d.com" in text
     assert "2" in text
+
+
+# ---------------------------------------------------------------------------
+# API: PUT /teams/{team_id}/slack-bot-token
+# API: DELETE /teams/{team_id}/slack-bot-token
+# ---------------------------------------------------------------------------
+
+mock_orm_team_bot = MagicMock()
+mock_orm_team_bot.id = 1
+mock_orm_team_bot.name = "Alpha"
+mock_orm_team_bot.manager_id = 1
+mock_orm_team_bot.slack_bot_token = "xoxb-test"
+
+def test_manager_can_set_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
+         patch("app.routers.team_router.team_crud.update_slack_bot_token", return_value=mock_orm_team_bot):
+        response = client.put(
+            "/teams/1/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert response.json()["slack_bot_token"] == "xoxb-test"
+
+def test_employee_cannot_set_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
+        response = client.put(
+            "/teams/1/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+def test_manager_can_remove_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
+         patch("app.routers.team_router.team_crud.update_slack_bot_token", return_value=None):
+        response = client.delete(
+            "/teams/1/slack-bot-token",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert "removed" in response.json()["message"]
