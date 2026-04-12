@@ -385,3 +385,14 @@ async def test_scheduler_continues_after_per_team_error():
     # Only team_ok should have triggered send_slack_report
     assert mock_send.call_count == 1
     assert mock_send.call_args[0][0] == "https://hooks.slack.com/b"
+
+
+def test_team_schema_has_slack_bot_token_not_webhook():
+    from app.schemas.team_schema import Team as TeamSchema
+    assert hasattr(TeamSchema, "slack_bot_token")
+    assert not hasattr(TeamSchema, "slack_webhook_url")
+
+
+def test_user_schema_has_slack_user_id():
+    from app.schemas.user_schema import User as UserSchema
+    assert hasattr(UserSchema, "slack_user_id")

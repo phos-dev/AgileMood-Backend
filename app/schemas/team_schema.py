@@ -21,7 +21,7 @@ class Team(db.Base):
     name = Column(String, nullable=False)
     manager_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.now)
-    slack_webhook_url = Column(String, nullable=True)
+    slack_bot_token = Column(String, nullable=True)
 
     manager = relationship("User", back_populates="managed_teams")
 
