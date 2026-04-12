@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.routers.authentication import (
@@ -15,7 +16,7 @@ from app.models.token_model import Token
 
 from app.crud import user_crud
 from app.databases.postgres_database import get_db
-from app.utils.constants import Errors, Messages
+from app.utils.constants import Errors, Messages, Role
 from app.utils.logger import logger
 
 
@@ -108,3 +109,52 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
         raise Errors.NOT_FOUND
     user_crud.delete_user(db=db, user_id=user_id)
     return Messages.USER_DELETE
+
+
+class SlackUserIdUpdate(BaseModel):
+    slack_user_id: str
+
+
+@router.put("/{user_id}/slack-user-id", response_model=UserInDB)
+def set_slack_user_id(
+    user_id: int,
+    slack_id_update: SlackUserIdUpdate,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Sets a manual Slack user ID override for a user.
+    Only managers can configure this.
+    """
+    if current_user.role != Role.MANAGER:
+        raise Errors.NO_PERMISSION
+
+    target_user = user_crud.get_user_by_id(db, user_id)
+    if not target_user:
+        raise Errors.NOT_FOUND
+
+    updated = user_crud.update_slack_user_id(db, user_id, slack_id_update.slack_user_id)
+    if updated is None:
+        raise Errors.INVALID_PARAMS
+    return updated
+
+
+@router.delete("/{user_id}/slack-user-id")
+def remove_slack_user_id(
+    user_id: int,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Removes the manual Slack user ID override for a user.
+    Only managers can do this.
+    """
+    if current_user.role != Role.MANAGER:
+        raise Errors.NO_PERMISSION
+
+    target_user = user_crud.get_user_by_id(db, user_id)
+    if not target_user:
+        raise Errors.NOT_FOUND
+
+    user_crud.update_slack_user_id(db, user_id, None)
+    return {"message": f"Slack user ID removed for user {user_id}."}

@@ -585,3 +585,57 @@ def test_manager_can_remove_slack_bot_token():
         )
     assert response.status_code == 200
     assert "removed" in response.json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# API: PUT /user/{user_id}/slack-user-id
+# API: DELETE /user/{user_id}/slack-user-id
+# ---------------------------------------------------------------------------
+
+mock_user_with_slack = MagicMock()
+mock_user_with_slack.id = 2
+mock_user_with_slack.name = "Employee"
+mock_user_with_slack.email = "employee@example.com"
+mock_user_with_slack.slack_user_id = "U12345"
+mock_user_with_slack.role = "employee"
+mock_user_with_slack.disabled = False
+mock_user_with_slack.hashed_password = "x"
+mock_user_with_slack.avatar = None
+
+def test_manager_can_set_user_slack_id():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.user_router.user_crud.get_user_by_id", return_value=employee_user), \
+         patch("app.routers.user_router.user_crud.update_slack_user_id", return_value=mock_user_with_slack):
+        response = client.put(
+            "/user/2/slack-user-id",
+            json={"slack_user_id": "U12345"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert response.json()["slack_user_id"] == "U12345"
+
+def test_employee_cannot_set_other_user_slack_id():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user):
+        response = client.put(
+            "/user/3/slack-user-id",
+            json={"slack_user_id": "U12345"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+def test_manager_can_remove_user_slack_id():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.user_router.user_crud.get_user_by_id", return_value=employee_user), \
+         patch("app.routers.user_router.user_crud.update_slack_user_id", return_value=employee_user):
+        response = client.delete(
+            "/user/2/slack-user-id",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert "removed" in response.json()["message"]
