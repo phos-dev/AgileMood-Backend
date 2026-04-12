@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.databases.postgres_database import SessionLocal
@@ -13,7 +14,6 @@ from app.services.slack_service import (
     send_dm,
 )
 from app.utils.logger import logger
-import pytz
 
 
 async def send_weekly_reports():

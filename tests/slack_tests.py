@@ -162,10 +162,6 @@ def test_build_no_data_blocks_structure():
 
 
 # ---------------------------------------------------------------------------
-# slack_service: send_slack_report (async)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # report_scheduler: send_weekly_reports
 # ---------------------------------------------------------------------------
 
@@ -515,3 +511,114 @@ async def test_scheduler_report_continues_after_per_team_error():
         from app.services.report_scheduler import send_weekly_reports
         await send_weekly_reports()
     assert mock_send.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# slack_service: send_dm error paths
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_send_dm_timeout():
+    import httpx
+    from app.services.slack_service import send_dm
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_send_dm_network_error():
+    import httpx
+    from app.services.slack_service import send_dm
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(side_effect=httpx.RequestError("network error"))
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# slack_service: resolve_slack_user missing_scope path
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_missing_scope_skips_fallback():
+    from app.services.slack_service import resolve_slack_user
+    # Even if slack_user_id override is set, missing_scope is a fatal config error
+    # and should return None immediately (cannot proceed with any token).
+    mock_user = MagicMock(email="a@b.com", slack_user_id="U-MANUAL")
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "missing_scope"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# API: team_not_found and employee_cannot_remove for slack-bot-token
+# ---------------------------------------------------------------------------
+
+def test_set_slack_bot_token_team_not_found():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=None):
+        response = client.put(
+            "/teams/99/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 404
+
+
+def test_employee_cannot_remove_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
+        response = client.delete(
+            "/teams/1/slack-bot-token",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# report_scheduler: no-data path
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_scheduler_sends_no_data_message_when_empty():
+    from app.models.reports_model import EmojiDistributionReport
+    empty_emoji_report = EmojiDistributionReport(
+        emoji_distribution=[], negative_emotion_ratio=0.0, alert=None
+    )
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=manager_mock, members=[]
+    )
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", new_callable=AsyncMock, return_value="U-MGR"), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report", return_value=empty_emoji_report), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=SAMPLE_INTENSITY_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=SAMPLE_ANON_REPORT), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    mock_send.assert_called_once()
+    # Verify build_no_data_blocks was used: first block should be a header with no emotion data
+    call_blocks = mock_send.call_args[0][2]
+    assert call_blocks[0]["type"] == "header"
+    assert len(call_blocks) == 2  # header + body only, no dividers/emotion sections
