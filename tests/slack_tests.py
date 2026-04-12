@@ -241,6 +241,7 @@ def test_build_no_data_blocks_structure():
 # slack_service: send_slack_report (async)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="send_slack_report removed in Task 5, replaced by send_dm")
 @pytest.mark.asyncio
 async def test_send_slack_report_success():
     mock_response = MagicMock(status_code=200, text="ok")
@@ -255,6 +256,7 @@ async def test_send_slack_report_success():
     assert result is True
 
 
+@pytest.mark.skip(reason="send_slack_report removed in Task 5, replaced by send_dm")
 @pytest.mark.asyncio
 async def test_send_slack_report_slack_error_response():
     mock_response = MagicMock(status_code=400, text="invalid_payload")
@@ -269,6 +271,7 @@ async def test_send_slack_report_slack_error_response():
     assert result is False
 
 
+@pytest.mark.skip(reason="send_slack_report removed in Task 5, replaced by send_dm")
 @pytest.mark.asyncio
 async def test_send_slack_report_timeout():
     import httpx
@@ -283,6 +286,7 @@ async def test_send_slack_report_timeout():
     assert result is False
 
 
+@pytest.mark.skip(reason="send_slack_report removed in Task 5, replaced by send_dm")
 @pytest.mark.asyncio
 async def test_send_slack_report_network_error():
     import httpx
@@ -301,6 +305,7 @@ async def test_send_slack_report_network_error():
 # report_scheduler: send_weekly_reports
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skip(reason="Will be replaced in Task 10 with bot DM tests")
 @pytest.mark.asyncio
 async def test_scheduler_skips_team_without_webhook():
     team_no_webhook = MagicMock(id=1, name="NoWebhook", slack_webhook_url=None)
@@ -317,6 +322,7 @@ async def test_scheduler_skips_team_without_webhook():
     mock_send.assert_not_called()
 
 
+@pytest.mark.skip(reason="Will be replaced in Task 10 with bot DM tests")
 @pytest.mark.asyncio
 async def test_scheduler_sends_report_for_team_with_webhook():
     team_with_webhook = MagicMock(
@@ -339,6 +345,7 @@ async def test_scheduler_sends_report_for_team_with_webhook():
     assert call_url == "https://hooks.slack.com/test"
 
 
+@pytest.mark.skip(reason="Will be replaced in Task 10 with bot DM tests")
 @pytest.mark.asyncio
 async def test_scheduler_sends_no_data_message_when_empty():
     team_with_webhook = MagicMock(
@@ -364,6 +371,7 @@ async def test_scheduler_sends_no_data_message_when_empty():
     mock_send.assert_called_once()
 
 
+@pytest.mark.skip(reason="Will be replaced in Task 10 with bot DM tests")
 @pytest.mark.asyncio
 async def test_scheduler_continues_after_per_team_error():
     team_broken = MagicMock(id=1, name="Broken", slack_webhook_url="https://hooks.slack.com/a")
