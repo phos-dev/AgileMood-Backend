@@ -3,7 +3,7 @@ from datetime import datetime
 from app.models.user_model import UserInTeam
 from app.models.emotion_record_model import EmotionRecordInTeam
 from app.models.emotion_model import EmotionInDb
-from typing import List
+from typing import List, Optional
 
 
 class Team(BaseModel):
@@ -17,9 +17,14 @@ class TeamData(Team):
     id: int
     manager_id: int | None = None
     created_at: datetime = Field(default_factory=datetime.now)
+    slack_webhook_url: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class SlackWebhookUpdate(BaseModel):
+    slack_webhook_url: str
 
 
 class TeamResponse(BaseModel):

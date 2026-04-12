@@ -16,9 +16,12 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+from app.databases.postgres_database import Base
+import app.schemas.team_schema  # noqa: F401 - ensure Team model is registered
+import app.schemas.user_schema  # noqa: F401
+import app.schemas.emotion_record_schema  # noqa: F401
+import app.schemas.feedback_schema  # noqa: F401
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

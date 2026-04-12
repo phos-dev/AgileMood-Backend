@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Annotated
 from app.core.auth_utils import ensure_is_team_manager, ensure_is_team_member_or_manager
-from app.models.team_model import Team, TeamResponse, AllTeamsResponse, TeamData
+from app.models.team_model import Team, TeamResponse, AllTeamsResponse, TeamData, SlackWebhookUpdate
 from app.models.user_model import UserInDB
 from app.models.emotion_model import AllEmotionsResponse
 from app.databases.postgres_database import get_db
@@ -144,6 +144,49 @@ def remove_team_member(
 
     team_crud.remove_team_member(db, team_id, user.id)
     return Messages.MEMBER_ADDED_TO_TEAM
+
+
+@router.put("/{team_id}/slack-webhook", response_model=TeamData)
+def set_slack_webhook(
+    team_id: int,
+    webhook_update: SlackWebhookUpdate,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Sets or updates the Slack webhook URL for a team.
+    Only the team manager can configure this.
+    """
+    team = team_crud.get_team_by_id(db, team_id)
+    if not team:
+        raise Errors.NOT_FOUND
+
+    ensure_is_team_manager(team, current_user)
+
+    updated = team_crud.update_slack_webhook(db, team_id, webhook_update.slack_webhook_url)
+    if updated is None:
+        raise Errors.INVALID_PARAMS
+    return updated
+
+
+@router.delete("/{team_id}/slack-webhook")
+def remove_slack_webhook(
+    team_id: int,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Removes the Slack webhook URL from a team (disables Slack reporting).
+    Only the team manager can do this.
+    """
+    team = team_crud.get_team_by_id(db, team_id)
+    if not team:
+        raise Errors.NOT_FOUND
+
+    ensure_is_team_manager(team, current_user)
+
+    team_crud.update_slack_webhook(db, team_id, None)
+    return {"message": f"Slack webhook removed for team {team_id}."}
 
 
 @router.get("/{team_id}/emotions", response_model=AllEmotionsResponse)

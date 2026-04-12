@@ -152,6 +152,28 @@ def remove_team_member(db: Session, team_id: int, user_id: int):
     return get_team_by_id(db, team_id)
 
 
+def update_slack_webhook(db: Session, team_id: int, webhook_url: str | None):
+    """
+    Sets or clears the Slack webhook URL for a team.
+    """
+    db_team = db.query(Team).filter(Team.id == team_id).first()
+    if db_team is None:
+        logger.error(f"Team with ID {team_id} not found.")
+        return None
+    db_team.slack_webhook_url = webhook_url
+    db.commit()
+    db.refresh(db_team)
+    logger.debug(f"Slack webhook updated for team {team_id}.")
+    return db_team
+
+
+def get_all_teams(db: Session):
+    """
+    Returns all teams. Used by the Slack report scheduler.
+    """
+    return db.query(Team).all()
+
+
 def is_manager_of_team(db: Session, user_id: int, team_id: int) -> bool:
     """
     Verifies if the user is the team's manager
