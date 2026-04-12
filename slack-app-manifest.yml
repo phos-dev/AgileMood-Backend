@@ -1,0 +1,22 @@
+# slack-app-manifest.yml
+# Use this to create the AgileMood Slack App in one click:
+# 1. Go to https://api.slack.com/apps
+# 2. Click "Create New App" → "From a manifest"
+# 3. Paste this file's contents
+# 4. Install to workspace
+# 5. Copy "Bot User OAuth Token" (xoxb-...)
+# 6. PUT /teams/{team_id}/slack-bot-token with the token
+display_information:
+  name: AgileMood
+  description: Psychological safety tracker for agile teams
+  background_color: "#1a1a2e"
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - users:read.email
+      - im:write
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
