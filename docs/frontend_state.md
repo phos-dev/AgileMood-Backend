@@ -1,5 +1,7 @@
 # Frontend Integration Notes
 
+> See `docs/backend_architecture.md` for full endpoint list.
+
 ## Scope
 
 This is a **backend-only** repository. The frontend lives in a separate repo. This document covers the API contract that the frontend consumes.

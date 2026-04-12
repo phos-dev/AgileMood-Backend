@@ -12,9 +12,10 @@ The project is structured as a modular web application to allow easy integration
 * **Integrations:** Connects with platforms like Slack or Microsoft Teams via webhooks and APIs.
 
 ## HOW: Working on AgileMood
-To keep this context focused, specific technical instructions are separated into focused documents. Before starting a task, please review the relevant documentation in the `agent_docs/` folder:
+To keep this context focused, specific technical instructions are separated into focused documents. Before starting a task, please review the relevant documentation in the `docs/` folder:
 
-* **Architecture & APIs:** Read `agent_docs/backend_architecture.md` for endpoint structures, auth flow (SSO/OIDC/RBAC), and database schemas.
-* **Frontend Components:** Read `agent_docs/frontend_state.md` for UI guidelines and state management.
-* **Testing & Verification:** Read `agent_docs/running_tests.md` for instructions on running the test suites to verify your changes.
-* **Linting:** Do not manually format code. Run the project's automated linters and formatters as defined in `agent_docs/code_conventions.md`.
+* **Architecture & APIs:** Read `docs/backend_architecture.md` for endpoint structures, auth flow (SSO/OIDC/RBAC), and database schemas.
+* **Domain Model & Business Rules:** Read `docs/platform_overview.md` for domain entities, business rules, and Slack integration rationale.
+* **Frontend Components:** Read `docs/frontend_state.md` for UI guidelines and state management.
+* **Testing & Verification:** Read `docs/running_tests.md` for instructions on running the test suites to verify your changes.
+* **Linting:** Do not manually format code. Run the project's automated linters and formatters as defined in `docs/code_conventions.md`.

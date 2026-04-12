@@ -1,5 +1,7 @@
 # Code Conventions
 
+> See `docs/backend_architecture.md` for auth/RBAC implementation reference.
+
 ## Language & Runtime
 
 - Python 3.12 (`runtime.txt`)

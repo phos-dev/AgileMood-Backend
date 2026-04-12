@@ -1,5 +1,7 @@
 # Backend Architecture & APIs
 
+> See `docs/platform_overview.md` for domain model & business rules.
+
 ## Stack
 
 | Layer | Technology |
