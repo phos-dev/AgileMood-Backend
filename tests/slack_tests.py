@@ -639,3 +639,81 @@ def test_manager_can_remove_user_slack_id():
         )
     assert response.status_code == 200
     assert "removed" in response.json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# report_scheduler: bot DM implementation (Task 8)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_scheduler_skips_team_without_bot_token():
+    team_no_token = MagicMock(id=1, name="NoToken", slack_bot_token=None, members=[], manager=MagicMock())
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_no_token]), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    mock_send.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_scheduler_sends_report_dm_to_manager():
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=manager_mock, members=[]
+    )
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", new_callable=AsyncMock, return_value="U-MGR"), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report", return_value=SAMPLE_EMOJI_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=SAMPLE_INTENSITY_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=SAMPLE_ANON_REPORT), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][1] == "U-MGR"
+
+@pytest.mark.asyncio
+async def test_reminder_scheduler_sends_dm_to_members():
+    member_mock = MagicMock(email="emp@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=MagicMock(email="mgr@test.com", slack_user_id=None),
+        members=[member_mock]
+    )
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", new_callable=AsyncMock, return_value="U-EMP"), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reminders
+        await send_weekly_reminders()
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][1] == "U-EMP"
+
+@pytest.mark.asyncio
+async def test_reminder_notifies_manager_of_unreachable_members():
+    member_unreachable = MagicMock(email="emp@test.com", slack_user_id=None)
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=manager_mock,
+        members=[member_unreachable]
+    )
+    async def side_effect(token, user):
+        if user is manager_mock:
+            return "U-MGR"
+        return None
+
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", side_effect=side_effect), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reminders
+        await send_weekly_reminders()
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][1] == "U-MGR"
