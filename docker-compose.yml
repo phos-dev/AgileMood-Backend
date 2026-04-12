@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: agilemood
+      POSTGRES_PASSWORD: agilemood
+      POSTGRES_DB: agilemood
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agilemood"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://agilemood:agilemood@db:5432/agilemood
+      SECRET_KEY: dev-secret-key-change-in-prod
+    ports:
+      - "8000:8000"
+    entrypoint: ["./entrypoint.sh"]
+
+volumes:
+  postgres_data:
