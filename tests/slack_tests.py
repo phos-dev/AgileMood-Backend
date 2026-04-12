@@ -396,3 +396,16 @@ def test_team_schema_has_slack_bot_token_not_webhook():
 def test_user_schema_has_slack_user_id():
     from app.schemas.user_schema import User as UserSchema
     assert hasattr(UserSchema, "slack_user_id")
+
+
+def test_team_pydantic_model_has_slack_bot_token():
+    from app.models.team_model import TeamData, SlackBotTokenUpdate
+    td = TeamData(id=1, name="A", slack_bot_token="xoxb-123")
+    assert td.slack_bot_token == "xoxb-123"
+    upd = SlackBotTokenUpdate(slack_bot_token="xoxb-456")
+    assert upd.slack_bot_token == "xoxb-456"
+
+def test_user_pydantic_model_has_slack_user_id():
+    from app.models.user_model import UserInTeam
+    u = UserInTeam(name="A", email="a@b.com", slack_user_id="U12345")
+    assert u.slack_user_id == "U12345"

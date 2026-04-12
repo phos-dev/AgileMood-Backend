@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Annotated
 from app.core.auth_utils import ensure_is_team_manager, ensure_is_team_member_or_manager
-from app.models.team_model import Team, TeamResponse, AllTeamsResponse, TeamData, SlackWebhookUpdate
+from app.models.team_model import Team, TeamResponse, AllTeamsResponse, TeamData, SlackBotTokenUpdate
 from app.models.user_model import UserInDB
 from app.models.emotion_model import AllEmotionsResponse
 from app.databases.postgres_database import get_db
@@ -149,7 +149,7 @@ def remove_team_member(
 @router.put("/{team_id}/slack-webhook", response_model=TeamData)
 def set_slack_webhook(
     team_id: int,
-    webhook_update: SlackWebhookUpdate,
+    webhook_update: SlackBotTokenUpdate,
     current_user: Annotated[UserInDB, Depends(get_current_active_user)],
     db: Session = Depends(get_db),
 ):
@@ -163,7 +163,7 @@ def set_slack_webhook(
 
     ensure_is_team_manager(team, current_user)
 
-    updated = team_crud.update_slack_webhook(db, team_id, webhook_update.slack_webhook_url)
+    updated = team_crud.update_slack_webhook(db, team_id, webhook_update.slack_bot_token)
     if updated is None:
         raise Errors.INVALID_PARAMS
     return updated

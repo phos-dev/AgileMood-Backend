@@ -17,14 +17,14 @@ class TeamData(Team):
     id: int
     manager_id: int | None = None
     created_at: datetime = Field(default_factory=datetime.now)
-    slack_webhook_url: Optional[str] = None
+    slack_bot_token: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 
-class SlackWebhookUpdate(BaseModel):
-    slack_webhook_url: str
+class SlackBotTokenUpdate(BaseModel):
+    slack_bot_token: str
 
 
 class TeamResponse(BaseModel):
@@ -32,27 +32,8 @@ class TeamResponse(BaseModel):
     members: List[UserInTeam]
     emotions_reports: List[EmotionRecordInTeam]
     emotions: List[EmotionInDb]
-    manager: UserInTeam  # Adiciona o manager real do time
+    manager: UserInTeam
 
 
 class AllTeamsResponse(BaseModel):
     teams: List[TeamData]
-
-
-# class Team(BaseModel):
-#     name: str
-
-#     class Config:
-#         from_attributes = True
-
-
-# class TeamCreate(Team):
-#     manager_id: int | None = None
-
-
-# class TeamData(TeamCreate):
-#     id: int
-#     created_at: datetime = Field(default_factory=datetime.now)
-
-#     class Config:
-#         from_attributes = True
