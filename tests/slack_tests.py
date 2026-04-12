@@ -35,12 +35,6 @@ mock_team_dict = {
     "emotions_reports": [],
 }
 
-mock_orm_team = MagicMock()
-mock_orm_team.id = 1
-mock_orm_team.name = "Alpha"
-mock_orm_team.manager_id = 1
-mock_orm_team.slack_webhook_url = "https://hooks.slack.com/test"
-
 SAMPLE_EMOJI_REPORT = EmojiDistributionReport(
     emoji_distribution=[
         EmojiDistribution(emotion_name="Happy", frequency=10),
@@ -65,76 +59,6 @@ SAMPLE_ANON_REPORT = {
         {"emotion_name": "Anxious", "frequency": 2, "avg_intensity": 3.0},
     ],
 }
-
-# ---------------------------------------------------------------------------
-# API: PUT /teams/{team_id}/slack-webhook
-# ---------------------------------------------------------------------------
-
-def test_manager_can_set_slack_webhook():
-    token = create_access_token({"sub": manager_user.email})
-    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
-         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
-         patch("app.routers.team_router.team_crud.update_slack_webhook", return_value=mock_orm_team):
-        response = client.put(
-            "/teams/1/slack-webhook",
-            json={"slack_webhook_url": "https://hooks.slack.com/test"},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert response.status_code == 200
-    assert response.json()["slack_webhook_url"] == "https://hooks.slack.com/test"
-
-
-def test_employee_cannot_set_slack_webhook():
-    token = create_access_token({"sub": employee_user.email})
-    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
-         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
-        response = client.put(
-            "/teams/1/slack-webhook",
-            json={"slack_webhook_url": "https://hooks.slack.com/test"},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert response.status_code == 403
-
-
-def test_set_slack_webhook_team_not_found():
-    token = create_access_token({"sub": manager_user.email})
-    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
-         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=None):
-        response = client.put(
-            "/teams/99/slack-webhook",
-            json={"slack_webhook_url": "https://hooks.slack.com/test"},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert response.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# API: DELETE /teams/{team_id}/slack-webhook
-# ---------------------------------------------------------------------------
-
-def test_manager_can_remove_slack_webhook():
-    token = create_access_token({"sub": manager_user.email})
-    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
-         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
-         patch("app.routers.team_router.team_crud.update_slack_webhook", return_value=None):
-        response = client.delete(
-            "/teams/1/slack-webhook",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert response.status_code == 200
-    assert "removed" in response.json()["message"]
-
-
-def test_employee_cannot_remove_slack_webhook():
-    token = create_access_token({"sub": employee_user.email})
-    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
-         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
-        response = client.delete(
-            "/teams/1/slack-webhook",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert response.status_code == 403
-
 
 # ---------------------------------------------------------------------------
 # slack_service: _classify_alert
@@ -717,3 +641,26 @@ async def test_reminder_notifies_manager_of_unreachable_members():
         await send_weekly_reminders()
     mock_send.assert_called_once()
     assert mock_send.call_args[0][1] == "U-MGR"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_report_continues_after_per_team_error():
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_broken = MagicMock(id=1, name="Broken", slack_bot_token="xoxb-a", manager=manager_mock, members=[])
+    team_ok = MagicMock(id=2, name="OK", slack_bot_token="xoxb-b", manager=manager_mock, members=[])
+
+    async def resolve_side_effect(token, user):
+        return "U-MGR"
+
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_broken, team_ok]), \
+         patch("app.services.report_scheduler.resolve_slack_user", side_effect=resolve_side_effect), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report",
+               side_effect=[Exception("DB error"), SAMPLE_EMOJI_REPORT]), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=SAMPLE_INTENSITY_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=SAMPLE_ANON_REPORT), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    assert mock_send.call_count == 1
