@@ -409,3 +409,40 @@ def test_user_pydantic_model_has_slack_user_id():
     from app.models.user_model import UserInTeam
     u = UserInTeam(name="A", email="a@b.com", slack_user_id="U12345")
     assert u.slack_user_id == "U12345"
+
+
+def test_update_slack_bot_token_sets_value():
+    from app.crud.team_crud import update_slack_bot_token
+    from unittest.mock import MagicMock
+    db = MagicMock()
+    mock_team = MagicMock(id=1)
+    db.query.return_value.filter.return_value.first.return_value = mock_team
+    result = update_slack_bot_token(db, 1, "xoxb-new")
+    assert mock_team.slack_bot_token == "xoxb-new"
+    db.commit.assert_called_once()
+
+def test_update_slack_bot_token_team_not_found():
+    from app.crud.team_crud import update_slack_bot_token
+    from unittest.mock import MagicMock
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = None
+    result = update_slack_bot_token(db, 99, "xoxb-x")
+    assert result is None
+
+def test_update_slack_user_id_sets_value():
+    from app.crud.user_crud import update_slack_user_id
+    from unittest.mock import MagicMock, patch
+    db = MagicMock()
+    mock_user = MagicMock(id=2)
+    with patch("app.crud.user_crud.get_user_by_id", return_value=mock_user):
+        result = update_slack_user_id(db, 2, "U12345")
+    assert mock_user.slack_user_id == "U12345"
+    db.commit.assert_called_once()
+
+def test_update_slack_user_id_user_not_found():
+    from app.crud.user_crud import update_slack_user_id
+    from unittest.mock import MagicMock, patch
+    db = MagicMock()
+    with patch("app.crud.user_crud.get_user_by_id", return_value=None):
+        result = update_slack_user_id(db, 99, "U12345")
+    assert result is None

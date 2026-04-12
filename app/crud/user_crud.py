@@ -59,6 +59,21 @@ def update_user(db: Session, user_id: int, user_update: dict):
     return user
 
 
+def update_slack_user_id(db: Session, user_id: int, slack_user_id: str | None):
+    """
+    Sets or clears the manual Slack user ID override for a user.
+    """
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        logger.error(f"User with ID {user_id} not found.")
+        return None
+    user.slack_user_id = slack_user_id
+    db.commit()
+    db.refresh(user)
+    logger.debug(f"Slack user ID updated for user {user_id}.")
+    return user
+
+
 def delete_user(db: Session, user_id: int):
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     db.delete(user)

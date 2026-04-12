@@ -152,18 +152,18 @@ def remove_team_member(db: Session, team_id: int, user_id: int):
     return get_team_by_id(db, team_id)
 
 
-def update_slack_webhook(db: Session, team_id: int, webhook_url: str | None):
+def update_slack_bot_token(db: Session, team_id: int, bot_token: str | None):
     """
-    Sets or clears the Slack webhook URL for a team.
+    Sets or clears the Slack bot token for a team.
     """
     db_team = db.query(Team).filter(Team.id == team_id).first()
     if db_team is None:
         logger.error(f"Team with ID {team_id} not found.")
         return None
-    db_team.slack_webhook_url = webhook_url
+    db_team.slack_bot_token = bot_token
     db.commit()
     db.refresh(db_team)
-    logger.debug(f"Slack webhook updated for team {team_id}.")
+    logger.debug(f"Slack bot token updated for team {team_id}.")
     return db_team
 
 
