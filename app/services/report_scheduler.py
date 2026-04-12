@@ -2,15 +2,15 @@ from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-
+from apscheduler.triggers.date import DateTrigger
 from app.databases.postgres_database import SessionLocal
 from app.crud import reports_crud, team_crud
 from app.services.slack_service import (
     build_weekly_report_blocks,
     build_no_data_blocks,
-    send_slack_report,
 )
 from app.utils.logger import logger
+import pytz
 
 
 async def send_weekly_reports():
@@ -77,13 +77,17 @@ def create_scheduler() -> AsyncIOScheduler:
     Creates and configures the APScheduler instance.
     Trigger: every Monday at 09:00 UTC.
     """
+    send_weekly_reports()
     scheduler = AsyncIOScheduler()
+    run_time = datetime.now(pytz.UTC) + timedelta(seconds=20)
     scheduler.add_job(
         send_weekly_reports,
-        CronTrigger(day_of_week="mon", hour=9, minute=0, timezone="UTC"),
+        DateTrigger(run_date=run_time),
         id="weekly_slack_report",
         name="Weekly Slack Mood Report",
         replace_existing=True,
         misfire_grace_time=3600,
     )
+    print("Adding job weekly_slack_report")
     return scheduler
+

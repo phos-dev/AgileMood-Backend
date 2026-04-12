@@ -11,7 +11,6 @@ from app.routers.authentication import create_access_token
 from app.services.slack_service import (
     build_weekly_report_blocks,
     build_no_data_blocks,
-    send_slack_report,
     _classify_alert,
 )
 
@@ -446,3 +445,84 @@ def test_update_slack_user_id_user_not_found():
     with patch("app.crud.user_crud.get_user_by_id", return_value=None):
         result = update_slack_user_id(db, 99, "U12345")
     assert result is None
+
+import pytest
+from unittest.mock import patch, AsyncMock, MagicMock
+
+@pytest.mark.asyncio
+async def test_send_dm_success():
+    from app.services.slack_service import send_dm
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": True}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is True
+
+@pytest.mark.asyncio
+async def test_send_dm_slack_error():
+    from app.services.slack_service import send_dm
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "channel_not_found"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is False
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_by_email():
+    from app.services.slack_service import resolve_slack_user
+    mock_user = MagicMock(email="a@b.com", slack_user_id=None)
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": True, "user": {"id": "U99999"}}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result == "U99999"
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_falls_back_to_override():
+    from app.services.slack_service import resolve_slack_user
+    mock_user = MagicMock(email="a@b.com", slack_user_id="U-MANUAL")
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "users_not_found"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result == "U-MANUAL"
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_returns_none_when_unresolvable():
+    from app.services.slack_service import resolve_slack_user
+    mock_user = MagicMock(email="a@b.com", slack_user_id=None)
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "users_not_found"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result is None
+
+def test_build_reminder_blocks_contains_message():
+    from app.services.slack_service import build_reminder_blocks
+    blocks = build_reminder_blocks()
+    assert len(blocks) >= 1
+    text = blocks[0]["text"]["text"]
+    assert "AgileMood" in text
+
+def test_build_unreachable_notification_blocks():
+    from app.services.slack_service import build_unreachable_notification_blocks
+    blocks = build_unreachable_notification_blocks(["a@b.com", "c@d.com"])
+    text = blocks[0]["text"]["text"]
+    assert "a@b.com" in text
+    assert "c@d.com" in text
+    assert "2" in text
