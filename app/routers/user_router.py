@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.routers.authentication import (
     get_current_active_user,
 )
 
+from app.services.report_scheduler import send_weekly_reports, send_weekly_reminders
 from app.models.user_model import UserCreate, UserInDB, UserInTeam
 from app.models.token_model import Token
 
@@ -25,6 +26,16 @@ router = APIRouter(
     tags=["user"],
 )
 
+
+@router.post("/test/trigger-reports")
+async def trigger_reports_now(background_tasks: BackgroundTasks):
+    background_tasks.add_task(send_weekly_reports)
+    return {"message": "Weekly reports triggered in the background!"}
+
+@router.post("/test/trigger-reminders")
+async def trigger_reminders_now(background_tasks: BackgroundTasks):
+    background_tasks.add_task(send_weekly_reminders)
+    return {"message": "Weekly reminders triggered in the background!"}
 
 @router.post("/login", response_model=Token)
 def login(

@@ -151,12 +151,20 @@ def build_weekly_report_blocks(
     alert_level = _classify_alert(negative_ratio)
     alert_emoji = ALERT_EMOJI_MAP[alert_level]
 
+    # Mapeando os níveis de alerta para português
+    alert_translations = {
+        "critical": "Crítico",
+        "warning": "Atenção",
+        "note": "Observação",
+        "ok": "Normal"
+    }
+
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"Weekly Mood Report — {team_name}",
+                "text": f"Relatório de Humor Semanal — {team_name}",
                 "emoji": True,
             },
         },
@@ -165,11 +173,11 @@ def build_weekly_report_blocks(
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Period:*\n{start_date} → {end_date}",
+                    "text": f"*Período:*\n{start_date} → {end_date}",
                 },
                 {
                     "type": "mrkdwn",
-                    "text": f"*Alert Level:*\n{alert_emoji} {alert_level.capitalize()}",
+                    "text": f"*Nível de Alerta:*\n{alert_emoji} {alert_translations[alert_level]}",
                 },
             ],
         },
@@ -179,14 +187,14 @@ def build_weekly_report_blocks(
     dist_rows = emoji_report.emoji_distribution[:10]
     if dist_rows:
         dist_lines = "\n".join(
-            f"• *{row.emotion_name}*: {row.frequency} records"
+            f"• *{row.emotion_name}*: {row.frequency} registros"
             for row in dist_rows
         )
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*Emotion Frequency Distribution:*\n{dist_lines}",
+                "text": f"*Distribuição de Frequência de Emoções:*\n{dist_lines}",
             },
         })
         blocks.append({
@@ -194,7 +202,7 @@ def build_weekly_report_blocks(
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Negative Emotion Ratio:*\n{negative_ratio:.1f}%",
+                    "text": f"*Taxa de Emoções Negativas:*\n{negative_ratio:.1f}%",
                 },
             ],
         })
@@ -203,14 +211,14 @@ def build_weekly_report_blocks(
     intensity_rows = intensity_report.get("average_intensity", [])[:10]
     if intensity_rows:
         intensity_lines = "\n".join(
-            f"• *{row['emotion_name']}*: avg intensity {row['avg_intensity']:.1f}"
+            f"• *{row['emotion_name']}*: intensidade média de {row['avg_intensity']:.1f}"
             for row in intensity_rows
         )
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*Average Intensity per Emotion:*\n{intensity_lines}",
+                "text": f"*Intensidade Média por Emoção:*\n{intensity_lines}",
             },
         })
         blocks.append({"type": "divider"})
@@ -218,14 +226,14 @@ def build_weekly_report_blocks(
     anon_rows = anonymous_report.get("all_user_emotion_records", [])[:10]
     if anon_rows:
         anon_lines = "\n".join(
-            f"• *{row['emotion_name']}*: {row['frequency']} times, avg intensity {row['avg_intensity']}"
+            f"• *{row['emotion_name']}*: {row['frequency']} vezes, intensidade média de {row['avg_intensity']}"
             for row in anon_rows
         )
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*Anonymous Submissions Summary:*\n{anon_lines}",
+                "text": f"*Resumo de Registros Anônimos:*\n{anon_lines}",
             },
         })
     else:
@@ -233,7 +241,7 @@ def build_weekly_report_blocks(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "_No anonymous submissions this week._",
+                "text": "_Nenhum registro anônimo nesta semana._",
             },
         })
 
@@ -242,7 +250,7 @@ def build_weekly_report_blocks(
         "elements": [
             {
                 "type": "mrkdwn",
-                "text": ":shield: This report contains no per-user data. All statistics are team-level aggregates.",
+                "text": ":shield: Este relatório não contém dados individuais. Todas as estatísticas são agregadas em nível de time.",
             }
         ],
     })
@@ -259,7 +267,7 @@ def build_no_data_blocks(team_name: str, start_date: str, end_date: str) -> list
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"Weekly Mood Report — {team_name}",
+                "text": f"Relatório de Humor Semanal — {team_name}",
                 "emoji": True,
             },
         },
@@ -268,9 +276,9 @@ def build_no_data_blocks(team_name: str, start_date: str, end_date: str) -> list
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"*Period:* {start_date} → {end_date}\n\n"
-                    "_No emotion records were submitted this week. "
-                    "Encourage your team to check in!_"
+                    f"*Período:* {start_date} → {end_date}\n\n"
+                    "_Nenhum registro de emoção foi enviado esta semana. "
+                    "Incentive sua equipe a fazer o check-in!_"
                 ),
             },
         },

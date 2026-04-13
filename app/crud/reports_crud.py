@@ -16,8 +16,8 @@ def get_emoji_distribution_report(db: Session, team_id: int, start_date: str | N
             func.count(EmotionRecord.id).label('frequency'),
             func.sum(case((Emotion.is_negative, 1), else_=0)).label('negative_count')
         )
-        .join(EmotionRecord, EmotionRecord.emotion_id.is_(Emotion.id))
-        .where(and_(filters))
+        .join(EmotionRecord, EmotionRecord.emotion_id == Emotion.id)
+        .where(and_(*filters))
         .group_by(Emotion.emoji, Emotion.name)
         .order_by(func.count(EmotionRecord.id).desc())
     )
@@ -41,14 +41,14 @@ def get_average_intensity_report(db: Session, team_id: int, start_date: str | No
     filters = build_emotion_filter(team_id, start_date, end_date)
     query = (
         select(
-            Emotion.emoji, 
-            Emotion.name, 
+            Emotion.emoji,
+            Emotion.name,
             func.avg(EmotionRecord.intensity).label('avg_intensity'),
             func.sum(case((Emotion.is_negative, 1), else_=0)).label('negative_count'),
             func.count(EmotionRecord.id).label('total_count')
         )
-        .join(EmotionRecord, EmotionRecord.emotion_id.is_(Emotion.id))
-        .where(and_(filters))
+        .join(EmotionRecord, EmotionRecord.emotion_id == Emotion.id)
+        .where(and_(*filters))
         .group_by(Emotion.emoji, Emotion.name)
         .order_by(func.avg(EmotionRecord.intensity).desc())
     )
@@ -72,11 +72,11 @@ def get_average_intensity_report(db: Session, team_id: int, start_date: str | No
 
 
 def get_emotion_analysis_by_user(
-    db: Session, 
-    team_id: int, 
-    user_id: int,  # Added to filter by specific user
-    start_date: str | None = None, 
-    end_date: str | None = None
+        db: Session,
+        team_id: int,
+        user_id: int,
+        start_date: str | None = None,
+        end_date: str | None = None
 ):
     """
     Generates a report of emotions for a specific user within a specific team.
@@ -102,40 +102,42 @@ def get_emotion_analysis_by_user(
             func.count(EmotionRecord.id).label("frequency"),  # Frequency of the emotion
             func.avg(EmotionRecord.intensity).label("average_intensity")  # Average intensity
         )
-        .join(EmotionRecord, EmotionRecord.user_id.is_(User.id))  # Join with EmotionRecord
-        .join(Emotion, EmotionRecord.emotion_id.is_(Emotion.id))  # Join with Emotion
-        .join(user_teams, User.id.is_(user_teams.c.user_id))      # Join with user_teams table
+        .join(EmotionRecord, EmotionRecord.user_id == User.id)
+        .join(Emotion, EmotionRecord.emotion_id == Emotion.id)
+        .join(user_teams, User.id == user_teams.c.user_id)
         .where(
             and_(
-                user_teams.c.team_id == team_id,            # Filter by team
-                User.id == user_id,                         # Filter by user
-                EmotionRecord.is_anonymous is False,        # Exclude anonymous records
-                EmotionRecord.timestamp >= start_date if start_date else True,  # Filter by start date
-                EmotionRecord.timestamp <= end_date if end_date else True       # Filter by end date
+                user_teams.c.team_id == team_id,
+                User.id == user_id,
+                EmotionRecord.is_anonymous == False,
+                EmotionRecord.created_at >= start_date if start_date else True,
+                EmotionRecord.created_at <= end_date if end_date else True
             )
         )
-        .group_by(User.name, Emotion.name, Emotion.emoji)  # Group by user and emotion
-        .order_by(User.name, func.count(EmotionRecord.id).desc())  # Order by username and frequency
+        .group_by(User.name, Emotion.name, Emotion.emoji)
+        .order_by(User.name, func.count(EmotionRecord.id).desc())
     )).all()
-    
-    # Formatting the result
+
+    if not rows:
+        return {"user_name": "Unknown", "all_user_emotion_records": []}
+
     result = {"user_name": rows[0].user_name, "all_user_emotion_records": []}
     for row in rows:
         result["all_user_emotion_records"].append({
             "emotion_name": row.emotion_name,
             "emoji": row.emoji,
             "frequency": row.frequency,
-            "avg_intensity": round(float(row.average_intensity), 2)  # Round average intensity
+            "avg_intensity": round(float(row.average_intensity), 2)
         })
-    
+
     return result
 
 
 def get_anonymous_emotion_analysis(
-    db: Session, 
-    team_id: int, 
-    start_date: str | None = None, 
-    end_date: str | None = None
+        db: Session,
+        team_id: int,
+        start_date: str | None = None,
+        end_date: str | None = None
 ):
     """
     Generates a report of anonymous emotions within a specific team.
@@ -160,27 +162,26 @@ def get_anonymous_emotion_analysis(
             func.avg(EmotionRecord.intensity).label("average_intensity")  # Average intensity
         )
         .select_from(EmotionRecord)
-        .join(Emotion, EmotionRecord.emotion_id.is_(Emotion.id))  # Join with Emotion
+        .join(Emotion, EmotionRecord.emotion_id == Emotion.id)
         .where(
             and_(
-                EmotionRecord.is_anonymous is True,  # Filter for anonymous records
-                Emotion.team_id == team_id,          # Filter by team
-                EmotionRecord.timestamp >= start_date if start_date else True,  # Filter by start date
-                EmotionRecord.timestamp <= end_date if end_date else True       # Filter by end date
+                EmotionRecord.is_anonymous == True,
+                Emotion.team_id == team_id,
+                EmotionRecord.created_at >= start_date if start_date else True,
+                EmotionRecord.created_at <= end_date if end_date else True
             )
         )
-        .group_by(Emotion.name, Emotion.emoji)  # Group by emotion
-        .order_by(func.count(EmotionRecord.id).desc())  # Order by frequency
+        .group_by(Emotion.name, Emotion.emoji)
+        .order_by(func.count(EmotionRecord.id).desc())
     )).all()
-    
-    # Formatting the result
+
     result = {"user_name": "Anonymous", "all_user_emotion_records": []}
     for row in rows:
         result["all_user_emotion_records"].append({
             "emotion_name": row.emotion_name,
             "emoji": row.emoji,
             "frequency": row.frequency,
-            "avg_intensity": round(float(row.average_intensity), 2)  # Round average intensity
+            "avg_intensity": round(float(row.average_intensity), 2)
         })
 
     return result
@@ -190,18 +191,18 @@ def build_emotion_filter(team_id: int, start_date: str | None, end_date: str | N
     filters = [Emotion.team_id == team_id]
 
     if start_date and end_date:
-        filters.append(EmotionRecord.timestamp.between(start_date, end_date))
+        filters.append(EmotionRecord.created_at.between(start_date, end_date))
     elif start_date:
-        filters.append(EmotionRecord.timestamp >= start_date)
+        filters.append(EmotionRecord.created_at >= start_date)
     elif end_date:
-        filters.append(EmotionRecord.timestamp <= end_date)
+        filters.append(EmotionRecord.created_at <= end_date)
 
     return filters
 
 
 def get_alert_message(negative_emotion_ratio: float) -> str | None:
     if negative_emotion_ratio > 50:
-        return "Crítico: Metade das das emoções registradas são negativas!"
+        return "Crítico: Metade das emoções registradas são negativas!"
 
     if negative_emotion_ratio > 30:
         return "Atenção: Um pouco menos da metade das emoções registradas são negativas!"

@@ -10,6 +10,10 @@ display_information:
   name: AgileMood
   description: Psychological safety tracker for agile teams
   background_color: "#1a1a2e"
+features:
+  bot_user:
+    display_name: AgileMood
+    always_online: false
 oauth_config:
   scopes:
     bot:
