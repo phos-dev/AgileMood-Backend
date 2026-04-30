@@ -56,9 +56,10 @@ User (manager | employee)
 - All report endpoints support optional `start_date` / `end_date` filters (ISO date format)
 
 ### Slack Integration
-- Teams can optionally set a `slack_webhook_url` (manager only, via `PUT /teams/{id}/slack-webhook`)
-- Weekly reports fire automatically every **Monday at 09:00 UTC** via APScheduler
-- Only teams with a webhook URL configured receive reports
+- Teams can optionally set a `slack_bot_token` (manager only, via `PUT /teams/{id}/slack-bot-token`)
+- Manager receives a weekly mood report DM every **Monday at 09:00 UTC** via APScheduler
+- Team members receive a check-in reminder DM every **Friday at 16:00 UTC**
+- Only teams with a bot token configured receive messages
 - Alert thresholds based on `negative_emotion_ratio`:
   - `> 50%` → critical (🔴)
   - `> 30%` → warning (🟡)

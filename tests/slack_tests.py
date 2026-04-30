@@ -105,7 +105,7 @@ def test_build_weekly_report_blocks_has_anonymity_footer():
     context_blocks = [b for b in blocks if b["type"] == "context"]
     assert len(context_blocks) == 1
     footer_text = context_blocks[0]["elements"][0]["text"]
-    assert "no per-user data" in footer_text
+    assert "não contém dados individuais" in footer_text
 
 
 def test_build_weekly_report_blocks_contains_emotion_names():
@@ -133,7 +133,7 @@ def test_build_weekly_report_blocks_alert_level_shown():
         for b in blocks if b["type"] == "section"
         for f in b.get("fields", [])
     ]
-    assert any("Note" in t for t in section_texts)
+    assert any("Observação" in t for t in section_texts)
 
 
 def test_build_weekly_report_blocks_no_anonymous_data():
@@ -146,7 +146,7 @@ def test_build_weekly_report_blocks_no_anonymous_data():
         b.get("text", {}).get("text", "")
         for b in blocks if b["type"] == "section"
     ]
-    assert any("No anonymous submissions" in t for t in section_texts)
+    assert any("Nenhum registro anônimo" in t for t in section_texts)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ def test_build_no_data_blocks_structure():
     assert blocks[0]["type"] == "header"
     assert "Alpha" in blocks[0]["text"]["text"]
     body_text = blocks[1]["text"]["text"]
-    assert "No emotion records" in body_text
+    assert "Nenhum registro de emoção" in body_text
 
 
 # ---------------------------------------------------------------------------

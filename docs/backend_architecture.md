@@ -13,7 +13,7 @@
 | Auth | OAuth2 + JWT HS256, 4h expiry |
 | Scheduler | APScheduler (AsyncIOScheduler) |
 | Migrations | Alembic |
-| HTTP client | httpx (async, for Slack webhooks) |
+| HTTP client | httpx (async, for Slack bot API) |
 | Python | 3.12 |
 
 ## Entry Point
@@ -91,8 +91,8 @@ RBAC helpers in `app/core/auth_utils.py`:
 | DELETE | `/teams/{team_id}` | Yes | Manager | Delete team |
 | POST | `/teams/{team_id}?user_email=...` | Yes | Manager | Add member |
 | DELETE | `/teams/{team_id}/member?user_email=...` | Yes | Manager | Remove member |
-| PUT | `/teams/{team_id}/slack-webhook` | Yes | Manager | Set Slack webhook URL |
-| DELETE | `/teams/{team_id}/slack-webhook` | Yes | Manager | Remove Slack webhook |
+| PUT | `/teams/{team_id}/slack-bot-token` | Yes | Manager | Set Slack bot token |
+| DELETE | `/teams/{team_id}/slack-bot-token` | Yes | Manager | Remove Slack bot token |
 | GET | `/teams/{team_id}/emotions` | Yes | Member/Manager | List team's emotions |
 
 ### Feedback (`/feedback`)
@@ -133,7 +133,7 @@ id                  int PK
 name                str
 manager_id          int FK→user.id
 created_at          datetime
-slack_webhook_url   str | None
+slack_bot_token     str | None
 ```
 Junction: `user_teams(user_id FK→user.id, team_id FK→team.id)`
 
@@ -173,9 +173,10 @@ created_at          datetime
 Files: `app/services/slack_service.py`, `app/services/report_scheduler.py`
 
 - Scheduler starts at app startup (lifespan) via `create_scheduler()` → `AsyncIOScheduler`
-- Trigger: every Monday 09:00 UTC, job ID `"weekly_slack_report"`
-- `send_weekly_reports()` iterates all teams with `slack_webhook_url`, fetches 7-day reports, builds Block Kit blocks, POSTs to webhook
-- `send_slack_report(url, blocks) → bool` — async, never raises, returns False on failure
+- Two jobs: weekly report (Mon 09:00 UTC, job ID `"weekly_slack_report"`) and weekly reminder (Fri 16:00 UTC, job ID `"weekly_slack_reminder"`)
+- `send_weekly_reports()` iterates teams with `slack_bot_token`, resolves manager Slack ID, fetches 7-day reports, builds Block Kit blocks, DMs manager
+- `send_weekly_reminders()` DMs each team member a check-in reminder; notifies manager of unreachable members
+- `send_dm(token, slack_user_id, blocks) → bool` — async, never raises, returns False on failure
 - Block Kit message contains: period, alert level, emotion distribution, avg intensity, anonymous summary
 - Privacy: no per-user data in any Slack message
 

@@ -52,7 +52,7 @@ Body: { emotion_id, intensity (1-5), notes?, is_anonymous? }
 ### Team details
 ```
 GET /teams/{team_id}
-→ { team_data: { id, name, manager_id, slack_webhook_url }, members: [...], emotions: [...] }
+→ { team_data: { id, name, manager_id, slack_bot_token }, members: [...], emotions: [...] }
 ```
 
 ### Feedback response field

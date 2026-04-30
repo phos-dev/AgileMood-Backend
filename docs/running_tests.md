@@ -54,14 +54,14 @@ from app.routers.authentication import create_access_token
 
 client = TestClient(app)
 
-def test_manager_can_set_slack_webhook():
+def test_manager_can_set_slack_bot_token():
     token = create_access_token({"sub": "manager@example.com"})
     with patch("app.crud.user_crud.get_user_by_email", return_value=mock_manager), \
          patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team), \
-         patch("app.routers.team_router.team_crud.update_slack_webhook", return_value=mock_team_orm):
+         patch("app.routers.team_router.team_crud.update_slack_bot_token", return_value=mock_team_orm):
         response = client.put(
-            "/teams/1/slack-webhook",
-            json={"slack_webhook_url": "https://hooks.slack.com/test"},
+            "/teams/1/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
             headers={"Authorization": f"Bearer {token}"},
         )
     assert response.status_code == 200
@@ -70,7 +70,7 @@ def test_manager_can_set_slack_webhook():
 Key points:
 - Patch the CRUD function at the **router's import path**, not the source module
 - Use `create_access_token` directly to generate valid test tokens — no need to call `/user/login`
-- For async Slack tests, mock `httpx.AsyncClient` or the `send_slack_report` function
+- For async Slack tests, mock `httpx.AsyncClient` or the `send_dm` function
 - `manager_knows_identity` in feedback responses depends on the mocked record's `is_anonymous` value
 
 ## What Is NOT Tested Here
