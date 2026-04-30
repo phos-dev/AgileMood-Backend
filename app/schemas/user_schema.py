@@ -15,6 +15,7 @@ class User(db.Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False, default=Role.EMPLOYEE)
     avatar = Column(String, nullable=True)
+    slack_user_id = Column(String, nullable=True)
 
     emotion_records = relationship("EmotionRecord", back_populates="user")
 

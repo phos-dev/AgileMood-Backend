@@ -1,0 +1,624 @@
+import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.models.user_model import UserInDB
+from app.models.reports_model import EmojiDistributionReport, EmojiDistribution
+from app.utils.constants import Role
+from app.routers.authentication import create_access_token
+from app.services.slack_service import (
+    build_weekly_report_blocks,
+    build_no_data_blocks,
+    _classify_alert,
+)
+
+# ---------------------------------------------------------------------------
+# Shared fixtures
+# ---------------------------------------------------------------------------
+
+client = TestClient(app)
+
+manager_user = UserInDB(
+    id=1, name="Manager", email="manager@example.com",
+    disabled=False, role=Role.MANAGER, hashed_password="x",
+)
+employee_user = UserInDB(
+    id=2, name="Employee", email="employee@example.com",
+    disabled=False, role=Role.EMPLOYEE, hashed_password="x",
+)
+
+mock_team_dict = {
+    "team_data": MagicMock(id=1, manager_id=1),
+    "members": [],
+    "emotions_reports": [],
+}
+
+SAMPLE_EMOJI_REPORT = EmojiDistributionReport(
+    emoji_distribution=[
+        EmojiDistribution(emotion_name="Happy", frequency=10),
+        EmojiDistribution(emotion_name="Stressed", frequency=4),
+    ],
+    negative_emotion_ratio=28.6,
+    alert=None,
+)
+
+SAMPLE_INTENSITY_REPORT = {
+    "average_intensity": [
+        {"emotion_name": "Happy", "avg_intensity": 3.5},
+        {"emotion_name": "Stressed", "avg_intensity": 4.2},
+    ],
+    "negative_emotion_ratio": 28.6,
+    "alert": None,
+}
+
+SAMPLE_ANON_REPORT = {
+    "user_name": "Anonymous",
+    "all_user_emotion_records": [
+        {"emotion_name": "Anxious", "frequency": 2, "avg_intensity": 3.0},
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# slack_service: _classify_alert
+# ---------------------------------------------------------------------------
+
+def test_classify_alert_critical():
+    assert _classify_alert(51.0) == "critical"
+
+def test_classify_alert_warning():
+    assert _classify_alert(35.0) == "warning"
+
+def test_classify_alert_note():
+    assert _classify_alert(20.0) == "note"
+
+def test_classify_alert_ok():
+    assert _classify_alert(10.0) == "ok"
+
+def test_classify_alert_boundary_critical():
+    assert _classify_alert(50.0) == "warning"  # > 50 is critical, exactly 50 is warning
+
+def test_classify_alert_boundary_ok():
+    assert _classify_alert(15.0) == "ok"  # > 15 is note, exactly 15 is ok
+
+
+# ---------------------------------------------------------------------------
+# slack_service: build_weekly_report_blocks
+# ---------------------------------------------------------------------------
+
+def test_build_weekly_report_blocks_has_header():
+    blocks = build_weekly_report_blocks(
+        "Alpha", "2026-04-04", "2026-04-11",
+        SAMPLE_EMOJI_REPORT, SAMPLE_INTENSITY_REPORT, SAMPLE_ANON_REPORT,
+    )
+    headers = [b for b in blocks if b["type"] == "header"]
+    assert len(headers) == 1
+    assert "Alpha" in headers[0]["text"]["text"]
+
+
+def test_build_weekly_report_blocks_has_anonymity_footer():
+    blocks = build_weekly_report_blocks(
+        "Alpha", "2026-04-04", "2026-04-11",
+        SAMPLE_EMOJI_REPORT, SAMPLE_INTENSITY_REPORT, SAMPLE_ANON_REPORT,
+    )
+    context_blocks = [b for b in blocks if b["type"] == "context"]
+    assert len(context_blocks) == 1
+    footer_text = context_blocks[0]["elements"][0]["text"]
+    assert "não contém dados individuais" in footer_text
+
+
+def test_build_weekly_report_blocks_contains_emotion_names():
+    blocks = build_weekly_report_blocks(
+        "Alpha", "2026-04-04", "2026-04-11",
+        SAMPLE_EMOJI_REPORT, SAMPLE_INTENSITY_REPORT, SAMPLE_ANON_REPORT,
+    )
+    all_text = " ".join(
+        str(b.get("text", {}).get("text", "") or
+            " ".join(f.get("text", "") for f in b.get("fields", [])))
+        for b in blocks
+    )
+    assert "Happy" in all_text
+    assert "Stressed" in all_text
+
+
+def test_build_weekly_report_blocks_alert_level_shown():
+    blocks = build_weekly_report_blocks(
+        "Alpha", "2026-04-04", "2026-04-11",
+        SAMPLE_EMOJI_REPORT, SAMPLE_INTENSITY_REPORT, SAMPLE_ANON_REPORT,
+    )
+    # negative_ratio=28.6 → "note" (> 15, not > 30)
+    section_texts = [
+        str(f.get("text", ""))
+        for b in blocks if b["type"] == "section"
+        for f in b.get("fields", [])
+    ]
+    assert any("Observação" in t for t in section_texts)
+
+
+def test_build_weekly_report_blocks_no_anonymous_data():
+    empty_anon = {"user_name": "Anonymous", "all_user_emotion_records": []}
+    blocks = build_weekly_report_blocks(
+        "Alpha", "2026-04-04", "2026-04-11",
+        SAMPLE_EMOJI_REPORT, SAMPLE_INTENSITY_REPORT, empty_anon,
+    )
+    section_texts = [
+        b.get("text", {}).get("text", "")
+        for b in blocks if b["type"] == "section"
+    ]
+    assert any("Nenhum registro anônimo" in t for t in section_texts)
+
+
+# ---------------------------------------------------------------------------
+# slack_service: build_no_data_blocks
+# ---------------------------------------------------------------------------
+
+def test_build_no_data_blocks_structure():
+    blocks = build_no_data_blocks("Alpha", "2026-04-04", "2026-04-11")
+    assert blocks[0]["type"] == "header"
+    assert "Alpha" in blocks[0]["text"]["text"]
+    body_text = blocks[1]["text"]["text"]
+    assert "Nenhum registro de emoção" in body_text
+
+
+# ---------------------------------------------------------------------------
+# report_scheduler: send_weekly_reports
+# ---------------------------------------------------------------------------
+
+def test_team_schema_has_slack_bot_token_not_webhook():
+    from app.schemas.team_schema import Team as TeamSchema
+    assert hasattr(TeamSchema, "slack_bot_token")
+    assert not hasattr(TeamSchema, "slack_webhook_url")
+
+
+def test_user_schema_has_slack_user_id():
+    from app.schemas.user_schema import User as UserSchema
+    assert hasattr(UserSchema, "slack_user_id")
+
+
+def test_team_pydantic_model_has_slack_bot_token():
+    from app.models.team_model import TeamData, SlackBotTokenUpdate
+    td = TeamData(id=1, name="A", slack_bot_token="xoxb-123")
+    assert td.slack_bot_token == "xoxb-123"
+    upd = SlackBotTokenUpdate(slack_bot_token="xoxb-456")
+    assert upd.slack_bot_token == "xoxb-456"
+
+def test_user_pydantic_model_has_slack_user_id():
+    from app.models.user_model import UserInTeam
+    u = UserInTeam(name="A", email="a@b.com", slack_user_id="U12345")
+    assert u.slack_user_id == "U12345"
+
+
+def test_update_slack_bot_token_sets_value():
+    from app.crud.team_crud import update_slack_bot_token
+    from unittest.mock import MagicMock
+    db = MagicMock()
+    mock_team = MagicMock(id=1)
+    db.query.return_value.filter.return_value.first.return_value = mock_team
+    result = update_slack_bot_token(db, 1, "xoxb-new")
+    assert mock_team.slack_bot_token == "xoxb-new"
+    db.commit.assert_called_once()
+
+def test_update_slack_bot_token_team_not_found():
+    from app.crud.team_crud import update_slack_bot_token
+    from unittest.mock import MagicMock
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = None
+    result = update_slack_bot_token(db, 99, "xoxb-x")
+    assert result is None
+
+def test_update_slack_user_id_sets_value():
+    from app.crud.user_crud import update_slack_user_id
+    from unittest.mock import MagicMock, patch
+    db = MagicMock()
+    mock_user = MagicMock(id=2)
+    with patch("app.crud.user_crud.get_user_by_id", return_value=mock_user):
+        result = update_slack_user_id(db, 2, "U12345")
+    assert mock_user.slack_user_id == "U12345"
+    db.commit.assert_called_once()
+
+def test_update_slack_user_id_user_not_found():
+    from app.crud.user_crud import update_slack_user_id
+    from unittest.mock import MagicMock, patch
+    db = MagicMock()
+    with patch("app.crud.user_crud.get_user_by_id", return_value=None):
+        result = update_slack_user_id(db, 99, "U12345")
+    assert result is None
+
+import pytest
+from unittest.mock import patch, AsyncMock, MagicMock
+
+@pytest.mark.asyncio
+async def test_send_dm_success():
+    from app.services.slack_service import send_dm
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": True}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is True
+
+@pytest.mark.asyncio
+async def test_send_dm_slack_error():
+    from app.services.slack_service import send_dm
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "channel_not_found"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is False
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_by_email():
+    from app.services.slack_service import resolve_slack_user
+    mock_user = MagicMock(email="a@b.com", slack_user_id=None)
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": True, "user": {"id": "U99999"}}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result == "U99999"
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_falls_back_to_override():
+    from app.services.slack_service import resolve_slack_user
+    mock_user = MagicMock(email="a@b.com", slack_user_id="U-MANUAL")
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "users_not_found"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result == "U-MANUAL"
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_returns_none_when_unresolvable():
+    from app.services.slack_service import resolve_slack_user
+    mock_user = MagicMock(email="a@b.com", slack_user_id=None)
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "users_not_found"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result is None
+
+def test_build_reminder_blocks_contains_message():
+    from app.services.slack_service import build_reminder_blocks
+    blocks = build_reminder_blocks()
+    assert len(blocks) >= 1
+    text = blocks[0]["text"]["text"]
+    assert "AgileMood" in text
+
+def test_build_unreachable_notification_blocks():
+    from app.services.slack_service import build_unreachable_notification_blocks
+    blocks = build_unreachable_notification_blocks(["a@b.com", "c@d.com"])
+    text = blocks[0]["text"]["text"]
+    assert "a@b.com" in text
+    assert "c@d.com" in text
+    assert "2" in text
+
+
+# ---------------------------------------------------------------------------
+# API: PUT /teams/{team_id}/slack-bot-token
+# API: DELETE /teams/{team_id}/slack-bot-token
+# ---------------------------------------------------------------------------
+
+mock_orm_team_bot = MagicMock()
+mock_orm_team_bot.id = 1
+mock_orm_team_bot.name = "Alpha"
+mock_orm_team_bot.manager_id = 1
+mock_orm_team_bot.slack_bot_token = "xoxb-test"
+
+def test_manager_can_set_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
+         patch("app.routers.team_router.team_crud.update_slack_bot_token", return_value=mock_orm_team_bot):
+        response = client.put(
+            "/teams/1/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert response.json()["slack_bot_token"] == "xoxb-test"
+
+def test_employee_cannot_set_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
+        response = client.put(
+            "/teams/1/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+def test_manager_can_remove_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
+         patch("app.routers.team_router.team_crud.update_slack_bot_token", return_value=None):
+        response = client.delete(
+            "/teams/1/slack-bot-token",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert "removed" in response.json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# API: PUT /user/{user_id}/slack-user-id
+# API: DELETE /user/{user_id}/slack-user-id
+# ---------------------------------------------------------------------------
+
+mock_user_with_slack = MagicMock()
+mock_user_with_slack.id = 2
+mock_user_with_slack.name = "Employee"
+mock_user_with_slack.email = "employee@example.com"
+mock_user_with_slack.slack_user_id = "U12345"
+mock_user_with_slack.role = "employee"
+mock_user_with_slack.disabled = False
+mock_user_with_slack.hashed_password = "x"
+mock_user_with_slack.avatar = None
+
+def test_manager_can_set_user_slack_id():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.user_router.user_crud.get_user_by_id", return_value=employee_user), \
+         patch("app.routers.user_router.user_crud.update_slack_user_id", return_value=mock_user_with_slack):
+        response = client.put(
+            "/user/2/slack-user-id",
+            json={"slack_user_id": "U12345"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert response.json()["slack_user_id"] == "U12345"
+
+def test_employee_cannot_set_other_user_slack_id():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user):
+        response = client.put(
+            "/user/3/slack-user-id",
+            json={"slack_user_id": "U12345"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+def test_manager_can_remove_user_slack_id():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.user_router.user_crud.get_user_by_id", return_value=employee_user), \
+         patch("app.routers.user_router.user_crud.update_slack_user_id", return_value=employee_user):
+        response = client.delete(
+            "/user/2/slack-user-id",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert "removed" in response.json()["message"]
+
+
+# ---------------------------------------------------------------------------
+# report_scheduler: bot DM implementation (Task 8)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_scheduler_skips_team_without_bot_token():
+    team_no_token = MagicMock(id=1, name="NoToken", slack_bot_token=None, members=[], manager=MagicMock())
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_no_token]), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    mock_send.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_scheduler_sends_report_dm_to_manager():
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=manager_mock, members=[]
+    )
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", new_callable=AsyncMock, return_value="U-MGR"), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report", return_value=SAMPLE_EMOJI_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=SAMPLE_INTENSITY_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=SAMPLE_ANON_REPORT), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][1] == "U-MGR"
+
+@pytest.mark.asyncio
+async def test_reminder_scheduler_sends_dm_to_members():
+    member_mock = MagicMock(email="emp@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=MagicMock(email="mgr@test.com", slack_user_id=None),
+        members=[member_mock]
+    )
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", new_callable=AsyncMock, return_value="U-EMP"), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reminders
+        await send_weekly_reminders()
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][1] == "U-EMP"
+
+@pytest.mark.asyncio
+async def test_reminder_notifies_manager_of_unreachable_members():
+    member_unreachable = MagicMock(email="emp@test.com", slack_user_id=None)
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=manager_mock,
+        members=[member_unreachable]
+    )
+    async def side_effect(token, user):
+        if user is manager_mock:
+            return "U-MGR"
+        return None
+
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", side_effect=side_effect), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reminders
+        await send_weekly_reminders()
+    mock_send.assert_called_once()
+    assert mock_send.call_args[0][1] == "U-MGR"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_report_continues_after_per_team_error():
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_broken = MagicMock(id=1, name="Broken", slack_bot_token="xoxb-a", manager=manager_mock, members=[])
+    team_ok = MagicMock(id=2, name="OK", slack_bot_token="xoxb-b", manager=manager_mock, members=[])
+
+    async def resolve_side_effect(token, user):
+        return "U-MGR"
+
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_broken, team_ok]), \
+         patch("app.services.report_scheduler.resolve_slack_user", side_effect=resolve_side_effect), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report",
+               side_effect=[Exception("DB error"), SAMPLE_EMOJI_REPORT]), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=SAMPLE_INTENSITY_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=SAMPLE_ANON_REPORT), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    assert mock_send.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# slack_service: send_dm error paths
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_send_dm_timeout():
+    import httpx
+    from app.services.slack_service import send_dm
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_send_dm_network_error():
+    import httpx
+    from app.services.slack_service import send_dm
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(side_effect=httpx.RequestError("network error"))
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await send_dm("xoxb-test", "U12345", [])
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# slack_service: resolve_slack_user missing_scope path
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_resolve_slack_user_missing_scope_skips_fallback():
+    from app.services.slack_service import resolve_slack_user
+    # Even if slack_user_id override is set, missing_scope is a fatal config error
+    # and should return None immediately (cannot proceed with any token).
+    mock_user = MagicMock(email="a@b.com", slack_user_id="U-MANUAL")
+    mock_response = MagicMock(json=MagicMock(return_value={"ok": False, "error": "missing_scope"}))
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+    with patch("app.services.slack_service.httpx.AsyncClient", return_value=mock_client):
+        result = await resolve_slack_user("xoxb-test", mock_user)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# API: team_not_found and employee_cannot_remove for slack-bot-token
+# ---------------------------------------------------------------------------
+
+def test_set_slack_bot_token_team_not_found():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=None):
+        response = client.put(
+            "/teams/99/slack-bot-token",
+            json={"slack_bot_token": "xoxb-test"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 404
+
+
+def test_employee_cannot_remove_slack_bot_token():
+    from app.routers.authentication import create_access_token
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
+        response = client.delete(
+            "/teams/1/slack-bot-token",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# report_scheduler: no-data path
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_scheduler_sends_no_data_message_when_empty():
+    from app.models.reports_model import EmojiDistributionReport
+    empty_emoji_report = EmojiDistributionReport(
+        emoji_distribution=[], negative_emotion_ratio=0.0, alert=None
+    )
+    manager_mock = MagicMock(email="mgr@test.com", slack_user_id=None)
+    team_with_token = MagicMock(
+        id=1, name="Alpha", slack_bot_token="xoxb-test",
+        manager=manager_mock, members=[]
+    )
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team_with_token]), \
+         patch("app.services.report_scheduler.resolve_slack_user", new_callable=AsyncMock, return_value="U-MGR"), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report", return_value=empty_emoji_report), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=SAMPLE_INTENSITY_REPORT), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=SAMPLE_ANON_REPORT), \
+         patch("app.services.report_scheduler.send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        from app.services.report_scheduler import send_weekly_reports
+        await send_weekly_reports()
+    mock_send.assert_called_once()
+    # Verify build_no_data_blocks was used: first block should be a header with no emotion data
+    call_blocks = mock_send.call_args[0][2]
+    assert call_blocks[0]["type"] == "header"
+    assert len(call_blocks) == 2  # header + body only, no dividers/emotion sections
