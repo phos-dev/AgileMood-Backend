@@ -2,6 +2,110 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
+# ---- API endpoint tests ----
+from fastapi.testclient import TestClient
+from app.main import app
+from app.models.user_model import UserInDB
+from app.utils.constants import Role
+from app.routers.authentication import create_access_token
+
+client = TestClient(app, follow_redirects=False)
+
+manager_user = UserInDB(
+    id=1, name="Manager", email="manager@example.com",
+    disabled=False, role=Role.MANAGER, hashed_password="x",
+)
+employee_user = UserInDB(
+    id=2, name="Employee", email="employee@example.com",
+    disabled=False, role=Role.EMPLOYEE, hashed_password="x",
+)
+mock_team_dict = {
+    "team_data": MagicMock(id=1, manager_id=1),
+    "members": [],
+    "emotions_reports": [],
+}
+
+
+def test_teams_connect_redirects_to_microsoft():
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
+         patch.dict(os.environ, {"TEAMS_APP_ID": "my-app-id", "TEAMS_REDIRECT_URI": "https://example.com/callback"}):
+        response = client.get(
+            "/teams/1/teams-connect",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 307
+    assert "login.microsoftonline.com" in response.headers["location"]
+    assert "my-app-id" in response.headers["location"]
+
+
+def test_teams_connect_manager_only():
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict):
+        response = client.get(
+            "/teams/1/teams-connect",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+
+def test_teams_callback_stores_tenant_id():
+    mock_team = MagicMock(id=1, teams_tenant_id="tenant-xyz")
+    with patch("app.routers.auth_router.team_crud.update_teams_tenant_id", return_value=mock_team), \
+         patch.dict(os.environ, {"FRONTEND_URL": "https://frontend.example.com"}):
+        response = client.get("/auth/teams/callback?tenant=tenant-xyz&state=1")
+    assert response.status_code == 307
+    assert "teams_connected=true" in response.headers["location"]
+
+
+def test_teams_disconnect_clears_tenant_id():
+    token = create_access_token({"sub": manager_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.team_router.team_crud.get_team_by_id", return_value=mock_team_dict), \
+         patch("app.routers.team_router.team_crud.update_teams_tenant_id", return_value=MagicMock()):
+        response = client.delete(
+            "/teams/1/teams-credentials",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert "disconnected" in response.json()["message"]
+
+
+def test_teams_user_id_put_manager_only():
+    token = create_access_token({"sub": employee_user.email})
+    with patch("app.crud.user_crud.get_user_by_email", return_value=employee_user):
+        response = client.put(
+            "/user/2/teams-user-id",
+            json={"teams_user_id": "aad-id-123"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 403
+
+
+def test_teams_user_id_delete():
+    token = create_access_token({"sub": manager_user.email})
+    mock_user_result = MagicMock()
+    mock_user_result.id = 2
+    mock_user_result.name = "Employee"
+    mock_user_result.email = "employee@example.com"
+    mock_user_result.role = "employee"
+    mock_user_result.disabled = False
+    mock_user_result.hashed_password = "x"
+    mock_user_result.avatar = None
+    mock_user_result.slack_user_id = None
+    mock_user_result.teams_user_id = None
+    with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
+         patch("app.routers.user_router.user_crud.get_user_by_id", return_value=employee_user), \
+         patch("app.routers.user_router.user_crud.update_teams_user_id", return_value=mock_user_result):
+        response = client.delete(
+            "/user/2/teams-user-id",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert response.status_code == 200
+    assert "removed" in response.json()["message"]
+
 # -- _classify_alert --
 from app.services.teams_service import _classify_alert
 
