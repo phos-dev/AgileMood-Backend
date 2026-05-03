@@ -18,6 +18,7 @@ class UserInDB(User):
     id: int | None = None
     hashed_password: str
     slack_user_id: Optional[str] = None
+    teams_user_id: Optional[str] = None
 
 
 class UserInTeam(BaseModel):
@@ -27,3 +28,4 @@ class UserInTeam(BaseModel):
     role: Literal["manager", "employee"] = Field(default="employee", description="User role in the organization")
     avatar: str | None = None
     slack_user_id: Optional[str] = None
+    teams_user_id: Optional[str] = None
