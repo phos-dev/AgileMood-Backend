@@ -224,7 +224,8 @@ async def test_send_dm_success():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=[conv_resp, act_resp])
-    with patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
+    with patch.dict(os.environ, {"TEAMS_APP_ID": "app-id"}), \
+         patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
         result = await send_dm("bot-token", "tenant-id", "aad-user-id", {"type": "AdaptiveCard"})
     assert result is True
 
@@ -237,7 +238,8 @@ async def test_send_dm_api_error():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=conv_resp)
-    with patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
+    with patch.dict(os.environ, {"TEAMS_APP_ID": "app-id"}), \
+         patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
         result = await send_dm("bot-token", "tenant-id", "aad-user-id", {"type": "AdaptiveCard"})
     assert result is False
 
@@ -249,7 +251,8 @@ async def test_send_dm_timeout():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
-    with patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
+    with patch.dict(os.environ, {"TEAMS_APP_ID": "app-id"}), \
+         patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
         result = await send_dm("bot-token", "tenant-id", "aad-user-id", {"type": "AdaptiveCard"})
     assert result is False
 
@@ -261,6 +264,7 @@ async def test_send_dm_network_error():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(side_effect=httpx.RequestError("network error"))
-    with patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
+    with patch.dict(os.environ, {"TEAMS_APP_ID": "app-id"}), \
+         patch("app.services.teams_service.httpx.AsyncClient", return_value=mock_client):
         result = await send_dm("bot-token", "tenant-id", "aad-user-id", {"type": "AdaptiveCard"})
     assert result is False

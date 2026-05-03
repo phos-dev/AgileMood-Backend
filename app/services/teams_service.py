@@ -79,19 +79,8 @@ async def resolve_teams_user(tenant_id: str, user) -> str | None:
     Never raises.
     """
     try:
+        graph_token = await get_graph_token(tenant_id)
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            token_resp = await client.post(
-                GRAPH_TOKEN_URL.format(tenant_id=tenant_id),
-                data={
-                    "grant_type":    "client_credentials",
-                    "client_id":     os.environ["TEAMS_APP_ID"],
-                    "client_secret": os.environ["TEAMS_APP_SECRET"],
-                    "scope":         "https://graph.microsoft.com/.default",
-                },
-            )
-            token_resp.raise_for_status()
-            graph_token = token_resp.json()["access_token"]
-
             user_resp = await client.get(
                 f"{GRAPH_API_BASE}/users/{user.email}",
                 headers={"Authorization": f"Bearer {graph_token}"},
@@ -121,7 +110,7 @@ async def send_dm(
     Sends a proactive DM to a Teams user via the Bot Framework Connector REST API.
     Returns True on success, False on any failure. Never raises.
     """
-    app_id = os.environ.get("TEAMS_APP_ID", "")
+    app_id = os.environ["TEAMS_APP_ID"]
     headers = {
         "Authorization": f"Bearer {bot_token}",
         "Content-Type":  "application/json",
