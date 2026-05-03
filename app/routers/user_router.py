@@ -11,7 +11,7 @@ from app.routers.authentication import (
     get_current_active_user,
 )
 
-from app.services.report_scheduler import send_weekly_reports, send_weekly_reminders
+from app.services.report_scheduler import send_weekly_reports, send_weekly_reminders, send_weekly_teams_reports, send_weekly_teams_reminders
 from app.models.user_model import UserCreate, UserInDB, UserInTeam
 from app.models.token_model import Token
 
@@ -222,13 +222,11 @@ def remove_teams_user_id(
 
 @router.post("/test/trigger-teams-reports")
 async def trigger_teams_reports_now(background_tasks: BackgroundTasks):
-    from app.services.report_scheduler import send_weekly_teams_reports
     background_tasks.add_task(send_weekly_teams_reports)
     return {"message": "Teams weekly reports triggered in the background!"}
 
 
 @router.post("/test/trigger-teams-reminders")
 async def trigger_teams_reminders_now(background_tasks: BackgroundTasks):
-    from app.services.report_scheduler import send_weekly_teams_reminders
     background_tasks.add_task(send_weekly_teams_reminders)
     return {"message": "Teams weekly reminders triggered in the background!"}
