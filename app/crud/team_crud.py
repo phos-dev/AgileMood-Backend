@@ -167,6 +167,18 @@ def update_slack_bot_token(db: Session, team_id: int, bot_token: str | None):
     return db_team
 
 
+def update_teams_tenant_id(db: Session, team_id: int, tenant_id: str | None):
+    db_team = db.query(Team).filter(Team.id == team_id).first()
+    if db_team is None:
+        logger.error(f"Team with ID {team_id} not found.")
+        return None
+    db_team.teams_tenant_id = tenant_id
+    db.commit()
+    db.refresh(db_team)
+    logger.debug(f"Teams tenant ID updated for team {team_id}.")
+    return db_team
+
+
 def get_all_teams(db: Session):
     """
     Returns all teams. Used by the Slack report scheduler.

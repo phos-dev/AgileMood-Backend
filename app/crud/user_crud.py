@@ -74,6 +74,18 @@ def update_slack_user_id(db: Session, user_id: int, slack_user_id: str | None):
     return user
 
 
+def update_teams_user_id(db: Session, user_id: int, teams_user_id: str | None):
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        logger.error(f"User with ID {user_id} not found.")
+        return None
+    user.teams_user_id = teams_user_id
+    db.commit()
+    db.refresh(user)
+    logger.debug(f"Teams user ID updated for user {user_id}.")
+    return user
+
+
 def delete_user(db: Session, user_id: int):
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     db.delete(user)
