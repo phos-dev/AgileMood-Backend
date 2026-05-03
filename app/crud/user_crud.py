@@ -75,6 +75,9 @@ def update_slack_user_id(db: Session, user_id: int, slack_user_id: str | None):
 
 
 def update_teams_user_id(db: Session, user_id: int, teams_user_id: str | None):
+    """
+    Sets or clears the Microsoft Teams user ID override for a user.
+    """
     user = get_user_by_id(db, user_id)
     if user is None:
         logger.error(f"User with ID {user_id} not found.")

@@ -168,6 +168,9 @@ def update_slack_bot_token(db: Session, team_id: int, bot_token: str | None):
 
 
 def update_teams_tenant_id(db: Session, team_id: int, tenant_id: str | None):
+    """
+    Sets or clears the Microsoft Teams tenant ID for a team.
+    """
     db_team = db.query(Team).filter(Team.id == team_id).first()
     if db_team is None:
         logger.error(f"Team with ID {team_id} not found.")
