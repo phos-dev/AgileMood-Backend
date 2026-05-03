@@ -206,8 +206,10 @@ def teams_connect(
     if not team:
         raise Errors.NOT_FOUND
     ensure_is_team_manager(team, current_user)
-    app_id = os.environ["TEAMS_APP_ID"]
-    redirect_uri = os.environ["TEAMS_REDIRECT_URI"]
+    app_id = os.environ.get("TEAMS_APP_ID")
+    redirect_uri = os.environ.get("TEAMS_REDIRECT_URI")
+    if not app_id or not redirect_uri:
+        raise HTTPException(status_code=500, detail="Teams integration is not configured on this server.")
     consent_url = (
         "https://login.microsoftonline.com/common/adminconsent"
         f"?client_id={app_id}"
