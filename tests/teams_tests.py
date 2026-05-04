@@ -445,6 +445,7 @@ async def test_teams_scheduler_sends_reminders():
         mock_session_cls.return_value.close = MagicMock()
         await send_weekly_teams_reminders()
     mock_send.assert_called_once()
+    assert mock_send.call_args[0][2] == "aad-emp-id"  # member, not manager
 
 @pytest.mark.asyncio
 async def test_teams_scheduler_notifies_manager_of_unreachable():

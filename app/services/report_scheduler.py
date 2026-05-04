@@ -153,6 +153,12 @@ async def send_weekly_teams_reports():
         start_str = start_date.isoformat()
         end_str = end_date.isoformat()
 
+        try:
+            bot_token = await get_bot_token()
+        except Exception as exc:
+            logger.error(f"Failed to get Teams bot token: {exc}", exc_info=True)
+            return
+
         teams = team_crud.get_all_teams(db)
         logger.debug(f"Weekly Teams report job started. Processing {len(teams)} teams.")
 
@@ -162,7 +168,6 @@ async def send_weekly_teams_reports():
                 continue
 
             try:
-                bot_token = await get_bot_token()
                 manager_teams_id = await resolve_teams_user(team.teams_tenant_id, team.manager)
                 if not manager_teams_id:
                     logger.error(f"Cannot resolve Teams user for manager of team {team.id}. Skipping report.")
@@ -207,6 +212,12 @@ async def send_weekly_teams_reminders():
     """
     db = SessionLocal()
     try:
+        try:
+            bot_token = await get_bot_token()
+        except Exception as exc:
+            logger.error(f"Failed to get Teams bot token: {exc}", exc_info=True)
+            return
+
         teams = team_crud.get_all_teams(db)
         logger.debug(f"Weekly Teams reminder job started. Processing {len(teams)} teams.")
 
@@ -216,7 +227,6 @@ async def send_weekly_teams_reminders():
                 continue
 
             try:
-                bot_token = await get_bot_token()
                 unreachable = []
                 reminder_card = build_reminder_card()
 
@@ -228,6 +238,7 @@ async def send_weekly_teams_reminders():
                             logger.warning(f"Failed to send Teams reminder DM to {member.email}")
                     else:
                         unreachable.append(member.email)
+                    # Bot Framework rate-limit mitigation
                     await asyncio.sleep(random.uniform(0.1, 0.5))
 
                 if unreachable:
@@ -252,9 +263,11 @@ async def send_weekly_teams_reminders():
 
 def create_scheduler() -> AsyncIOScheduler:
     """
-    Creates and configures the APScheduler instance with two jobs:
+    Creates and configures the APScheduler instance with four jobs:
     - Weekly report: every Monday at 09:00 UTC (managers)
     - Weekly reminder: every Friday at 16:00 UTC (team members)
+    - Weekly Teams report: every Monday at 09:00 UTC (managers)
+    - Weekly Teams reminder: every Friday at 16:00 UTC (team members)
     """
     scheduler = AsyncIOScheduler()
 
