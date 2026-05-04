@@ -88,7 +88,9 @@ def test_get_logged_user():
             "email": "johndoe@example.com",
             "team_id": 1,
             "avatar": None,
-            "role": "manager"
+            "role": "manager",
+            "slack_user_id": None,
+            "teams_user_id": None,
         }
         
 

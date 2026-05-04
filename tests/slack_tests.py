@@ -317,6 +317,7 @@ mock_orm_team_bot.id = 1
 mock_orm_team_bot.name = "Alpha"
 mock_orm_team_bot.manager_id = 1
 mock_orm_team_bot.slack_bot_token = "xoxb-test"
+mock_orm_team_bot.teams_tenant_id = None
 
 def test_manager_can_set_slack_bot_token():
     from app.routers.authentication import create_access_token
@@ -368,6 +369,7 @@ mock_user_with_slack.id = 2
 mock_user_with_slack.name = "Employee"
 mock_user_with_slack.email = "employee@example.com"
 mock_user_with_slack.slack_user_id = "U12345"
+mock_user_with_slack.teams_user_id = None
 mock_user_with_slack.role = "employee"
 mock_user_with_slack.disabled = False
 mock_user_with_slack.hashed_password = "x"
