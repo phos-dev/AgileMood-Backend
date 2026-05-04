@@ -1,0 +1,40 @@
+{
+  "_readme": "Reference manifest for the AgileMood Azure Bot. Replace all placeholders before uploading to Azure/Teams: <TEAMS_APP_ID> → your Azure App (client) ID, <FRONTEND_URL> → your frontend base URL (e.g. https://agilemood.app).",
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "<TEAMS_APP_ID>",
+  "developer": {
+    "name": "AgileMood",
+    "websiteUrl": "<FRONTEND_URL>",
+    "privacyUrl": "<FRONTEND_URL>/privacy",
+    "termsOfUseUrl": "<FRONTEND_URL>/terms"
+  },
+  "name": {
+    "short": "AgileMood",
+    "full": "AgileMood - Team Mood Tracker"
+  },
+  "description": {
+    "short": "Weekly mood reports and check-in reminders for agile teams.",
+    "full": "AgileMood sends weekly mood report summaries to team managers and check-in reminders to team members via Microsoft Teams."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#4F46E5",
+  "bots": [
+    {
+      "botId": "<TEAMS_APP_ID>",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": true
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": [],
+  "webApplicationInfo": {
+    "id": "<TEAMS_APP_ID>",
+    "resource": "https://graph.microsoft.com"
+  }
+}
