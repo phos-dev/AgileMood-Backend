@@ -498,7 +498,6 @@ async def test_teams_scheduler_isolates_per_team_errors():
 @pytest.mark.asyncio
 async def test_integration_full_report_flow():
     """Full weekly report: team has teams_tenant_id, manager resolvable, emotion data exists."""
-    import asyncio
     from app.services.report_scheduler import send_weekly_teams_reports
     from app.models.reports_model import EmojiDistributionReport, EmojiDistribution
     manager_mock = MagicMock(email="mgr@example.com", teams_user_id=None)
