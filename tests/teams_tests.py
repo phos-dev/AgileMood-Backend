@@ -491,3 +491,121 @@ async def test_teams_scheduler_isolates_per_team_errors():
         mock_session_cls.return_value.close = MagicMock()
         await send_weekly_teams_reports()
     assert mock_send.call_count == 1
+
+
+# ---- Integration tests ----
+
+@pytest.mark.asyncio
+async def test_integration_full_report_flow():
+    """Full weekly report: team has teams_tenant_id, manager resolvable, emotion data exists."""
+    import asyncio
+    from app.services.report_scheduler import send_weekly_teams_reports
+    from app.models.reports_model import EmojiDistributionReport, EmojiDistribution
+    manager_mock = MagicMock(email="mgr@example.com", teams_user_id=None)
+    team = MagicMock(id=1, name="Beta", teams_tenant_id="tenant-123", manager=manager_mock, members=[])
+    emoji_report = EmojiDistributionReport(
+        emoji_distribution=[EmojiDistribution(emotion_name="Happy", frequency=8)],
+        negative_emotion_ratio=15.0, alert=None,
+    )
+    intensity_report = {"average_intensity": [{"emotion_name": "Happy", "avg_intensity": 3.0}]}
+    anon_report = {"all_user_emotion_records": [{"emotion_name": "Sad", "frequency": 1, "avg_intensity": 2.0}]}
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team]), \
+         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-token"), \
+         patch("app.services.report_scheduler.resolve_teams_user", new_callable=AsyncMock, return_value="manager-aad-id"), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report", return_value=emoji_report), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value=intensity_report), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value=anon_report), \
+         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        await send_weekly_teams_reports()
+    mock_send.assert_called_once()
+    sent_card = mock_send.call_args[0][3]
+    assert "Relatório de Humor Semanal" in sent_card["body"][0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_integration_full_reminder_flow():
+    """Full reminder: team with tenant_id, 2 members both resolvable."""
+    from app.services.report_scheduler import send_weekly_teams_reminders
+    member1 = MagicMock(email="emp1@example.com", teams_user_id=None)
+    member2 = MagicMock(email="emp2@example.com", teams_user_id=None)
+    team = MagicMock(
+        id=1, name="Gamma", teams_tenant_id="tenant-456",
+        manager=MagicMock(email="mgr@example.com", teams_user_id=None),
+        members=[member1, member2],
+    )
+    resolve_ids = {"emp1@example.com": "aad-emp1", "emp2@example.com": "aad-emp2"}
+
+    async def resolve_side(tenant_id, user):
+        return resolve_ids.get(user.email)
+
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team]), \
+         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-token"), \
+         patch("app.services.report_scheduler.resolve_teams_user", side_effect=resolve_side), \
+         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_send, \
+         patch("app.services.report_scheduler.asyncio.sleep", new_callable=AsyncMock):
+        mock_session_cls.return_value.close = MagicMock()
+        await send_weekly_teams_reminders()
+    assert mock_send.call_count == 2
+    sent_recipients = {call[0][2] for call in mock_send.call_args_list}
+    assert sent_recipients == {"aad-emp1", "aad-emp2"}
+
+
+@pytest.mark.asyncio
+async def test_integration_unreachable_member_flow():
+    """Reminder with one unreachable member: reminder to reachable, notification to manager."""
+    from app.services.report_scheduler import send_weekly_teams_reminders
+    member_reachable = MagicMock(email="reach@example.com", teams_user_id=None)
+    member_unreachable = MagicMock(email="noreach@example.com", teams_user_id=None)
+    manager_mock = MagicMock(email="mgr@example.com", teams_user_id=None)
+    team = MagicMock(
+        id=1, name="Delta", teams_tenant_id="tenant-789",
+        manager=manager_mock,
+        members=[member_reachable, member_unreachable],
+    )
+
+    async def resolve_side(tenant_id, user):
+        if user is member_reachable:
+            return "aad-reachable"
+        if user is manager_mock:
+            return "aad-manager"
+        return None
+
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team]), \
+         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-token"), \
+         patch("app.services.report_scheduler.resolve_teams_user", side_effect=resolve_side), \
+         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_send, \
+         patch("app.services.report_scheduler.asyncio.sleep", new_callable=AsyncMock):
+        mock_session_cls.return_value.close = MagicMock()
+        await send_weekly_teams_reminders()
+    assert mock_send.call_count == 2
+    recipients = [call[0][2] for call in mock_send.call_args_list]
+    assert "aad-reachable" in recipients
+    assert "aad-manager" in recipients
+
+
+@pytest.mark.asyncio
+async def test_integration_no_data_report_flow():
+    """Report with no emotion data sends no-data card (still starts with report title, contains 'Nenhum registro')."""
+    from app.services.report_scheduler import send_weekly_teams_reports
+    from app.models.reports_model import EmojiDistributionReport
+    manager_mock = MagicMock(email="mgr@example.com", teams_user_id=None)
+    team = MagicMock(id=1, name="Epsilon", teams_tenant_id="tenant-321", manager=manager_mock, members=[])
+    empty_report = EmojiDistributionReport(emoji_distribution=[], negative_emotion_ratio=0.0, alert=None)
+    with patch("app.services.report_scheduler.SessionLocal") as mock_session_cls, \
+         patch("app.services.report_scheduler.team_crud.get_all_teams", return_value=[team]), \
+         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-token"), \
+         patch("app.services.report_scheduler.resolve_teams_user", new_callable=AsyncMock, return_value="manager-aad-id"), \
+         patch("app.services.report_scheduler.reports_crud.get_emoji_distribution_report", return_value=empty_report), \
+         patch("app.services.report_scheduler.reports_crud.get_average_intensity_report", return_value={}), \
+         patch("app.services.report_scheduler.reports_crud.get_anonymous_emotion_analysis", return_value={}), \
+         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_send:
+        mock_session_cls.return_value.close = MagicMock()
+        await send_weekly_teams_reports()
+    mock_send.assert_called_once()
+    sent_card = mock_send.call_args[0][3]
+    assert "Relatório de Humor Semanal" in sent_card["body"][0]["text"]
+    assert "Nenhum registro" in str(sent_card)
