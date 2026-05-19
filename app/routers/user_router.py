@@ -11,7 +11,7 @@ from app.routers.authentication import (
     get_current_active_user,
 )
 
-from app.services.report_scheduler import send_weekly_reports, send_weekly_reminders
+from app.services.report_scheduler import send_weekly_reports, send_weekly_reminders, send_weekly_teams_reports, send_weekly_teams_reminders
 from app.models.user_model import UserCreate, UserInDB, UserInTeam
 from app.models.token_model import Token
 
@@ -169,3 +169,64 @@ def remove_slack_user_id(
 
     user_crud.update_slack_user_id(db, user_id, None)
     return {"message": f"Slack user ID removed for user {user_id}."}
+
+
+class TeamsUserIdUpdate(BaseModel):
+    teams_user_id: str
+
+
+@router.put("/{user_id}/teams-user-id", response_model=UserInDB)
+def set_teams_user_id(
+    user_id: int,
+    teams_id_update: TeamsUserIdUpdate,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Sets a manual Teams AAD Object ID override for a user.
+    Only managers can configure this.
+    """
+    if current_user.role != Role.MANAGER:
+        raise Errors.NO_PERMISSION
+
+    target_user = user_crud.get_user_by_id(db, user_id)
+    if not target_user:
+        raise Errors.NOT_FOUND
+
+    updated = user_crud.update_teams_user_id(db, user_id, teams_id_update.teams_user_id)
+    if updated is None:
+        raise Errors.INVALID_PARAMS
+    return updated
+
+
+@router.delete("/{user_id}/teams-user-id")
+def remove_teams_user_id(
+    user_id: int,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Removes the manual Teams AAD Object ID override for a user.
+    Only managers can do this.
+    """
+    if current_user.role != Role.MANAGER:
+        raise Errors.NO_PERMISSION
+
+    target_user = user_crud.get_user_by_id(db, user_id)
+    if not target_user:
+        raise Errors.NOT_FOUND
+
+    user_crud.update_teams_user_id(db, user_id, None)
+    return {"message": f"Teams user ID removed for user {user_id}."}
+
+
+@router.post("/test/trigger-teams-reports")
+async def trigger_teams_reports_now(background_tasks: BackgroundTasks):
+    background_tasks.add_task(send_weekly_teams_reports)
+    return {"message": "Teams weekly reports triggered in the background!"}
+
+
+@router.post("/test/trigger-teams-reminders")
+async def trigger_teams_reminders_now(background_tasks: BackgroundTasks):
+    background_tasks.add_task(send_weekly_teams_reminders)
+    return {"message": "Teams weekly reminders triggered in the background!"}

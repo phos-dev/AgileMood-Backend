@@ -18,6 +18,7 @@ class TeamData(Team):
     manager_id: int | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     slack_bot_token: Optional[str] = None
+    teams_tenant_id: Optional[str] = None
 
     class Config:
         from_attributes = True

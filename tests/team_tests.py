@@ -11,10 +11,17 @@ manager_user = UserInDB(id=1, name="Manager", email="manager@example.com", disab
 employee_user = UserInDB(id=2, name="Employee", email="employee@example.com", disabled=False, role=Role.EMPLOYEE, hashed_password="x")
 outsider_user = UserInDB(id=3, name="Other", email="other@example.com", disabled=False, role=Role.EMPLOYEE, hashed_password="x")
 
+mock_member = MagicMock(id=2, email="employee@example.com", role="employee", avatar=None, slack_user_id=None, teams_user_id=None)
+mock_member.name = "Employee"
+mock_manager_orm = MagicMock(id=1, email="manager@example.com", role="manager", avatar=None, slack_user_id=None, teams_user_id=None)
+mock_manager_orm.name = "Manager"
+_mock_team_data = MagicMock(id=1, manager_id=1, slack_bot_token=None, teams_tenant_id=None)
+_mock_team_data.name = "Test Team"
 mock_team = {
-    "team_data": MagicMock(id=1, manager_id=1),
-    "members": [MagicMock(id=2)],
-    "emotions_reports": []
+    "team_data": _mock_team_data,
+    "members": [mock_member],
+    "emotions_reports": [],
+    "manager": mock_manager_orm,
 }
 
 

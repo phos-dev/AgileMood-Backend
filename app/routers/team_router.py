@@ -1,4 +1,7 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import Annotated
 from app.core.auth_utils import ensure_is_team_manager, ensure_is_team_member_or_manager
@@ -187,6 +190,50 @@ def remove_slack_bot_token(
 
     team_crud.update_slack_bot_token(db, team_id, None)
     return {"message": f"Slack bot token removed for team {team_id}."}
+
+
+@router.get("/{team_id}/teams-connect")
+def teams_connect(
+    team_id: int,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Initiates the Microsoft Teams OAuth admin consent flow.
+    Redirects the manager to the Microsoft consent page.
+    """
+    team = team_crud.get_team_by_id(db, team_id)
+    if not team:
+        raise Errors.NOT_FOUND
+    ensure_is_team_manager(team, current_user)
+    app_id = os.environ.get("TEAMS_APP_ID")
+    redirect_uri = os.environ.get("TEAMS_REDIRECT_URI")
+    if not app_id or not redirect_uri:
+        raise HTTPException(status_code=500, detail="Teams integration is not configured on this server.")
+    consent_url = (
+        "https://login.microsoftonline.com/common/adminconsent"
+        f"?client_id={app_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&state={team_id}"
+    )
+    return RedirectResponse(consent_url)
+
+
+@router.delete("/{team_id}/teams-credentials")
+def teams_disconnect(
+    team_id: int,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    """
+    Disconnects Microsoft Teams integration for a team.
+    """
+    team = team_crud.get_team_by_id(db, team_id)
+    if not team:
+        raise Errors.NOT_FOUND
+    ensure_is_team_manager(team, current_user)
+    team_crud.update_teams_tenant_id(db, team_id, None)
+    return {"message": f"Teams integration disconnected for team {team_id}."}
 
 
 @router.get("/{team_id}/emotions", response_model=AllEmotionsResponse)

@@ -11,6 +11,7 @@ from app.routers.emotion_record_router import router as emotion_record_router
 from app.routers.team_router import router as team_router
 from app.routers.reports_router import router as reports_router
 from app.routers.feedback_router import router as feedback_router
+from app.routers.auth_router import router as auth_router
 from app.services.report_scheduler import create_scheduler
 from dotenv import load_dotenv
 
@@ -44,6 +45,7 @@ app.include_router(emotion_record_router)
 app.include_router(team_router)
 app.include_router(reports_router)
 app.include_router(feedback_router)
+app.include_router(auth_router)
 
 
 @app.get("/ping", tags=["admin"])

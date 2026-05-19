@@ -22,6 +22,7 @@ class Team(db.Base):
     manager_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.now)
     slack_bot_token = Column(String, nullable=True)
+    teams_tenant_id = Column(String, nullable=True)
 
     manager = relationship("User", back_populates="managed_teams")
 
