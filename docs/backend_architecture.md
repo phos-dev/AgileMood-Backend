@@ -29,6 +29,14 @@ Health check: `GET /ping` → `{"message": "pong"}`
 
 CORS allowed origins: `http://localhost:3000`, any `*.vercel.app`
 
+### Auth callbacks
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/auth/teams/callback` | No | OAuth callback — saves `teams_tenant_id` to DB, redirects to frontend |
+| POST | `/user/test/trigger-teams-reports` | No | Dev only — manually trigger weekly Teams report job |
+| POST | `/user/test/trigger-teams-reminders` | No | Dev only — manually trigger weekly Teams reminder job |
+
 ## Auth Flow
 
 1. Client `POST /user/login` with `username` (email) + `password` (form data)
@@ -60,6 +68,8 @@ RBAC helpers in `app/core/auth_utils.py`:
 | GET | `/user/?email=...` | No | Any | Get user by email |
 | PUT | `/user/` | Yes | Any | Update current user |
 | DELETE | `/user/{user_id}` | No | Any | Delete user |
+| PUT | `/users/{user_id}/teams-user-id` | Yes | Manager | Set manual AAD Object ID for a member |
+| DELETE | `/users/{user_id}/teams-user-id` | Yes | Manager | Clear manual AAD Object ID override |
 
 ### Emotions (`/emotions`)
 
@@ -94,6 +104,8 @@ RBAC helpers in `app/core/auth_utils.py`:
 | PUT | `/teams/{team_id}/slack-bot-token` | Yes | Manager | Set Slack bot token |
 | DELETE | `/teams/{team_id}/slack-bot-token` | Yes | Manager | Remove Slack bot token |
 | GET | `/teams/{team_id}/emotions` | Yes | Member/Manager | List team's emotions |
+| GET | `/teams/{team_id}/teams-connect` | Yes | Manager | Start Microsoft Teams OAuth consent flow |
+| DELETE | `/teams/{team_id}/teams-credentials` | Yes | Manager | Disconnect Teams (removes stored tenant ID) |
 
 ### Feedback (`/feedback`)
 
@@ -179,6 +191,26 @@ Files: `app/services/slack_service.py`, `app/services/report_scheduler.py`
 - `send_dm(token, slack_user_id, blocks) → bool` — async, never raises, returns False on failure
 - Block Kit message contains: period, alert level, emotion distribution, avg intensity, anonymous summary
 - Privacy: no per-user data in any Slack message
+
+## Microsoft Teams Integration
+
+Files: `app/services/teams_service.py`, `app/services/report_scheduler.py`
+
+- Two scheduler jobs run alongside the Slack jobs: weekly report (Mon 09:00 UTC, job ID `"weekly_teams_report"`) and weekly reminder (Fri 16:00 UTC, job ID `"weekly_teams_reminder"`)
+- Teams without a `teams_tenant_id` are silently skipped each run
+- `send_dm(bot_token, tenant_id, teams_user_id, card) → bool` — async, never raises, returns False on any failure
+- DM delivery skips `POST /v3/conversations` (causes pairwise ID errors); instead installs the bot via Graph API and posts directly to the personal chat ID
+- Adaptive Card content mirrors Slack Block Kit messages: alert level, emotion distribution, avg intensity, anonymous summary — no per-user data
+- `resolve_teams_user(tenant_id, user) → str | None` — tries Graph API email lookup, falls back to `user.teams_user_id` manual override, returns None if unresolvable
+
+### DB additions (Teams)
+
+```
+Team.teams_tenant_id     str | None   — AAD tenant ID stored after admin consent
+User.teams_user_id       str | None   — manual AAD Object ID override
+```
+
+See `docs/teams-integration.md` for full Azure setup and common error reference.
 
 ## Constants Reference (`app/utils/constants.py`)
 
