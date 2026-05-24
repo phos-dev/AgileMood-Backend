@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import json
 import os
 from typing import Annotated
 
@@ -174,10 +175,31 @@ async def trello_sprint_end(
     team = team_crud.get_team_by_id(db, team_id)
     if not team:
         raise Errors.NOT_FOUND
-
     team_data = team["team_data"]
     if not team_data.trello_token:
         raise Errors.NOT_FOUND
+
+    try:
+        payload = json.loads(body)
+    except (ValueError, KeyError):
+        return {"message": "Event ignored."}
+
+    action = payload.get("action", {})
+    if action.get("type") != "updateCard":
+        return {"message": "Event ignored."}
+
+    data = action.get("data", {})
+    list_before = data.get("listBefore", {})
+    list_after = data.get("listAfter", {})
+    if not list_after or list_before.get("id") == list_after.get("id"):
+        return {"message": "Event ignored."}
+
+    # Only trigger when the moved card is a sprint-end sentinel
+    # (card name must contain "sprint" AND one of the end keywords)
+    _SPRINT_END_KEYWORDS = {"fim", "end", "terminou", "encerrado"}
+    card_name = data.get("card", {}).get("name", "").lower()
+    if "sprint" not in card_name or not any(kw in card_name for kw in _SPRINT_END_KEYWORDS):
+        return {"message": "Event ignored."}
 
     background_tasks.add_task(send_sprint_end_reminder, team_id)
     logger.debug(f"Trello sprint-end webhook received for team {team_id}. Reminder queued.")

@@ -116,16 +116,69 @@ def test_webhook_head_returns_200():
     assert response.status_code == 200
 
 
-def test_webhook_triggers_reminder():
+_SPRINT_END_CARD_MOVED = {
+    "action": {
+        "type": "updateCard",
+        "data": {
+            "card": {"name": "Sprint 3 - Fim"},
+            "listBefore": {"id": "list-a", "name": "Em andamento"},
+            "listAfter":  {"id": "list-b", "name": "Pronto"},
+        },
+    }
+}
+
+
+def test_webhook_triggers_on_sprint_end_card():
+    with patch.dict("os.environ", {"TRELLO_API_SECRET": ""}), \
+         patch("app.routers.trello_router.team_crud.get_team_by_id", return_value=mock_team), \
+         patch("app.routers.trello_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_reminder:
+        response = client.post("/webhooks/trello/sprint-end?team_id=1", json=_SPRINT_END_CARD_MOVED)
+    assert response.status_code == 200
+    assert "triggered" in response.json()["message"]
+    mock_reminder.assert_called_once()
+
+
+def test_webhook_ignores_non_updatecard_event():
     with patch.dict("os.environ", {"TRELLO_API_SECRET": ""}), \
          patch("app.routers.trello_router.team_crud.get_team_by_id", return_value=mock_team), \
          patch("app.routers.trello_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_reminder:
         response = client.post(
             "/webhooks/trello/sprint-end?team_id=1",
-            json={"action": {"type": "updateCard"}},
+            json={"action": {"type": "commentCard"}},
         )
     assert response.status_code == 200
-    assert "triggered" in response.json()["message"]
+    assert response.json()["message"] == "Event ignored."
+    mock_reminder.assert_not_called()
+
+
+def test_webhook_ignores_regular_card_move():
+    with patch.dict("os.environ", {"TRELLO_API_SECRET": ""}), \
+         patch("app.routers.trello_router.team_crud.get_team_by_id", return_value=mock_team), \
+         patch("app.routers.trello_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_reminder:
+        response = client.post(
+            "/webhooks/trello/sprint-end?team_id=1",
+            json={"action": {"type": "updateCard", "data": {
+                "card": {"name": "Fix login bug"},
+                "listBefore": {"id": "list-a", "name": "To Do"},
+                "listAfter":  {"id": "list-b", "name": "Done"},
+            }}},
+        )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Event ignored."
+    mock_reminder.assert_not_called()
+
+
+def test_webhook_ignores_non_move_update():
+    with patch.dict("os.environ", {"TRELLO_API_SECRET": ""}), \
+         patch("app.routers.trello_router.team_crud.get_team_by_id", return_value=mock_team), \
+         patch("app.routers.trello_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_reminder:
+        response = client.post(
+            "/webhooks/trello/sprint-end?team_id=1",
+            json={"action": {"type": "updateCard", "data": {"card": {"name": "Sprint 1 - Fim"}}}},
+        )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Event ignored."
+    mock_reminder.assert_not_called()
 
 
 def test_webhook_404_when_no_trello_token():

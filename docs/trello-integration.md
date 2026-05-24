@@ -111,7 +111,9 @@ O Power-Up valida o token contra a API antes de salvar. Se aparecer erro, verifi
 
 ### Passo 7 — Configurar gatilho de fim de sprint (RF01)
 
-Ao mover um card para a coluna final do sprint, o AgileMood envia automaticamente lembretes Slack (RF01) para todos os membros do time.
+Ao mover o **card sentinela de fim de sprint** para qualquer coluna, o AgileMood envia automaticamente lembretes Slack (RF01) para todos os membros do time solicitando o preenchimento do Questionário Anónimo Periódico.
+
+> **Por que card sentinela?** No Trello não existe conceito nativo de "sprint". O padrão adotado é criar um card dedicado (ex: `Sprint 3 - Fim`) que o gestor move manualmente quando decide encerrar a sprint. Assim o gatilho dispara uma única vez por sprint, no momento certo — e não a cada tarefa concluída.
 
 #### 7.1 Salvar o token Trello no AgileMood
 
@@ -136,7 +138,21 @@ curl -X POST "https://api.trello.com/1/webhooks" \
   -d "token=TOKEN_DO_PASSO_2"
 ```
 
-Após isso, cada vez que um card for movido no board, o Trello notificará o AgileMood e os lembretes RF01 serão disparados via Slack.
+#### 7.4 Criar o card sentinela de fim de sprint
+
+Crie um card no board com um nome que contenha **"sprint"** e uma das palavras-chave de encerramento:
+
+| Português | Inglês |
+|-----------|--------|
+| Sprint X - **Fim** | Sprint X - **End** |
+| Sprint X - **Terminou** | — |
+| Sprint X - **Encerrado** | — |
+
+**Exemplos válidos:** `Sprint 3 - Fim`, `Sprint 10 - Encerrado`, `Sprint 1 - End`
+
+Ao final de cada sprint, mova este card para qualquer coluna — o AgileMood detecta o nome do card e envia os lembretes RF01 via Slack para todos os membros do time.
+
+> Tarefas normais (ex: "Fix login bug", "Implementar RF06") **nunca** disparam o gatilho, independente da coluna para onde forem movidas.
 
 ---
 
@@ -178,7 +194,7 @@ curl -X DELETE "https://SEU_BACKEND/integrations/trello/disconnect?team_id=SEU_T
 | `app/services/slack_service.py` | Added `send_sprint_end_reminder(team_id)` |
 | `app/main.py` | Registered trello router; mounted `StaticFiles` at `/powerup/` |
 | `app/static/powerup/` | Power-Up HTML/JS files (index, settings, rf06, rf03, rf07, powerup.js) |
-| `tests/trello_tests.py` | 9 tests covering all endpoints |
+| `tests/trello_tests.py` | 14 tests covering all endpoints and sentinel card filtering |
 | `docs/trello-integration.md` | This document |
 
 ---
@@ -188,7 +204,7 @@ curl -X DELETE "https://SEU_BACKEND/integrations/trello/disconnect?team_id=SEU_T
 ```
 Manager board in Trello
         │
-        │  card moved to final column
+        │  sentinel card moved (name contains "sprint" + "fim/end/…")
         ▼
 POST /webhooks/trello/sprint-end?team_id=X   (no auth — Trello calls this)
         │
