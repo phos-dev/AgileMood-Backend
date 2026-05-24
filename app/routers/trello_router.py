@@ -214,6 +214,12 @@ async def trello_sprint_end(
     if not list_after or list_before.get("id") == list_after.get("id"):
         return {"message": "Event ignored."}
 
+    # Only trigger when the card is moved INTO a completion list
+    _DONE_LIST_KEYWORDS = {"done", "concluído", "concluido", "finalizado", "pronto", "encerrado", "fim"}
+    list_after_name = list_after.get("name", "").lower()
+    if not any(kw in list_after_name for kw in _DONE_LIST_KEYWORDS):
+        return {"message": "Event ignored."}
+
     # Only trigger when the moved card is a sprint-end sentinel
     # (card name must contain "sprint" AND one of the end keywords)
     _SPRINT_END_KEYWORDS = {"fim", "end", "terminou", "encerrado"}
