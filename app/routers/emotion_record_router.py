@@ -119,15 +119,7 @@ def get_emotion_record_by_id(
 ):
     logger.debug("call to get emotion record by id")
 
-    from app.schemas.emotion_record_schema import EmotionRecord as EmotionRecordSchema
-
-    db_record = (
-        db.query(EmotionRecordSchema)
-        .filter(EmotionRecordSchema.id == record_id)
-        .first()
-    )
-    if db_record is None or db_record.user_id != current_user.id:
-        raise Errors.NOT_FOUND
-
     record = emotion_record_crud.get_emotion_record_by_id(db, record_id)
+    if record is None or record.user_id != current_user.id:
+        raise Errors.NOT_FOUND
     return record

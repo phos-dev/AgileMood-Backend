@@ -318,6 +318,7 @@ mock_orm_team_bot.name = "Alpha"
 mock_orm_team_bot.manager_id = 1
 mock_orm_team_bot.slack_bot_token = "xoxb-test"
 mock_orm_team_bot.teams_tenant_id = None
+mock_orm_team_bot.trello_token = None
 
 def test_manager_can_set_slack_bot_token():
     from app.routers.authentication import create_access_token
