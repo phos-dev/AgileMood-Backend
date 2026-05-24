@@ -239,3 +239,30 @@ def test_webhook_accepts_valid_signature():
             },
         )
     assert response.status_code == 200
+
+
+def test_webhook_deduplicates_same_action_id():
+    """Trello sends the same webhook from multiple servers; second delivery must be ignored."""
+    payload = {
+        "action": {
+            "id": "abc123uniqueactionid",
+            "type": "updateCard",
+            "data": {
+                "card": {"name": "Sprint fim"},
+                "listBefore": {"id": "list1"},
+                "listAfter": {"id": "list2"},
+            },
+        }
+    }
+
+    with patch.dict("os.environ", {"TRELLO_API_SECRET": ""}), \
+         patch("app.routers.trello_router.team_crud.get_team_by_id", return_value=mock_team), \
+         patch("app.routers.trello_router.send_sprint_end_reminder", new_callable=AsyncMock), \
+         patch("app.routers.trello_router._SEEN_ACTION_IDS", new={}):
+        r1 = client.post("/webhooks/trello/sprint-end?team_id=1", json=payload)
+        r2 = client.post("/webhooks/trello/sprint-end?team_id=1", json=payload)
+
+    assert r1.status_code == 200
+    assert r1.json()["message"] == "Sprint-end reminder triggered."
+    assert r2.status_code == 200
+    assert r2.json()["message"] == "Duplicate event ignored."

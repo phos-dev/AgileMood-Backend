@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, HTTPException, Request, Response
@@ -20,6 +21,21 @@ from app.utils.constants import Errors
 from app.utils.logger import logger
 
 router = APIRouter(tags=["trello"])
+
+_SEEN_ACTION_IDS: dict[str, float] = {}
+_DEDUP_TTL_SECONDS = 60
+
+
+def _is_duplicate_action(action_id: str) -> bool:
+    now = time.time()
+    cutoff = now - _DEDUP_TTL_SECONDS
+    expired = [k for k, v in _SEEN_ACTION_IDS.items() if v < cutoff]
+    for k in expired:
+        del _SEEN_ACTION_IDS[k]
+    if action_id in _SEEN_ACTION_IDS:
+        return True
+    _SEEN_ACTION_IDS[action_id] = now
+    return False
 
 
 def _verify_trello_signature(body: bytes, callback_url: str, signature_header: str | None) -> bool:
@@ -187,6 +203,10 @@ async def trello_sprint_end(
     action = payload.get("action", {})
     if action.get("type") != "updateCard":
         return {"message": "Event ignored."}
+
+    action_id = action.get("id", "")
+    if action_id and _is_duplicate_action(action_id):
+        return {"message": "Duplicate event ignored."}
 
     data = action.get("data", {})
     list_before = data.get("listBefore", {})
