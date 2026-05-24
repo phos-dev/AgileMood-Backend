@@ -1,7 +1,12 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # 🚀 Importação do CORS
+from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.rate_limiter import limiter
 
 from app.schemas.user_schema import db
 from app.databases.postgres_database import Base, engine, get_db
@@ -12,12 +17,14 @@ from app.routers.team_router import router as team_router
 from app.routers.reports_router import router as reports_router
 from app.routers.feedback_router import router as feedback_router
 from app.routers.auth_router import router as auth_router
+from app.routers.trello_router import router as trello_router
 from app.services.report_scheduler import create_scheduler
 from dotenv import load_dotenv
 
 load_dotenv()  # Carrega as variáveis do arquivo .env
 
 db.Base.metadata.create_all(bind=engine)
+
 
 
 @asynccontextmanager
@@ -29,11 +36,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+_vercel_origins = os.getenv("ALLOWED_VERCEL_ORIGIN", "")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # Permite acesso do frontend local
-    allow_origin_regex="https://.*\\.vercel\\.app$",
+    allow_origin_regex=rf"https://{_vercel_origins}\.vercel\.app$" if _vercel_origins else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +56,9 @@ app.include_router(team_router)
 app.include_router(reports_router)
 app.include_router(feedback_router)
 app.include_router(auth_router)
+app.include_router(trello_router)
+
+app.mount("/powerup", StaticFiles(directory="app/static/powerup", html=True), name="powerup")
 
 
 @app.get("/ping", tags=["admin"])

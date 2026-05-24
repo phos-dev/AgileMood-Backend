@@ -19,6 +19,18 @@ class TeamData(Team):
     created_at: datetime = Field(default_factory=datetime.now)
     slack_bot_token: Optional[str] = None
     teams_tenant_id: Optional[str] = None
+    trello_token: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TeamDataSafe(Team):
+    """TeamData without sensitive integration tokens — safe to return in API responses."""
+    id: int
+    manager_id: int | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    teams_tenant_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -26,6 +38,10 @@ class TeamData(Team):
 
 class SlackBotTokenUpdate(BaseModel):
     slack_bot_token: str
+
+
+class TrelloConnectRequest(BaseModel):
+    trello_token: str
 
 
 class TeamResponse(BaseModel):

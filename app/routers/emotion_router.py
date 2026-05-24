@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from typing import Annotated
 
+from app.core.rate_limiter import limiter
 from app.crud import emotion_crud
 
 from app.models.emotion_model import EmotionInDb, Emotion, AllEmotionsResponse
@@ -40,6 +41,13 @@ def create_emotion(
     return response
 
 
+@router.get("/public", response_model=AllEmotionsResponse)
+@limiter.limit("60/minute")
+def get_emotions_public(request: Request, team_id: int, db: Session = Depends(get_db)):
+    emotions = emotion_crud.get_emotions_by_team(db, team_id)
+    return AllEmotionsResponse(emotions=emotions or [])
+
+
 @router.get("/{emotion_id}", response_model=AllEmotionReportsResponse)
 def get_emotion_by_id(
         current_user: Annotated[UserInDB, Depends(get_current_active_user)],
@@ -63,17 +71,16 @@ def get_emotion_by_id(
 def get_all_emotions(
         current_user: Annotated[UserInDB, Depends(get_current_active_user)],
         db: Session = Depends(get_db),
+        team_id: int | None = None,
 ):
     logger.debug("call to get all emotions")
 
-    # if current_user.role != Role.MANAGER:
-    #     raise Errors.NO_PERMISSION
+    if team_id is not None:
+        emotions = emotion_crud.get_emotions_by_team(db, team_id)
+    else:
+        emotions = emotion_crud.get_all_emotions(db, current_user.id)
 
-    emotions = emotion_crud.get_all_emotions(db, current_user.id)
-    if emotions is None:
-        logger.error(f"no emotions found in the database")
-    
-    return AllEmotionsResponse(emotions=emotions)
+    return AllEmotionsResponse(emotions=emotions or [])
 
 
 @router.put("/{emotion_id}", response_model=EmotionInDb)

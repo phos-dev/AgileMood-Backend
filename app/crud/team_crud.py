@@ -38,12 +38,16 @@ def get_team_by_id(db: Session, team_id: int):
 
     # Obtém os registros de emoção dos membros do time
     member_ids = [user.id for user in team.members]
+    if team.manager_id and team.manager_id not in member_ids:
+        member_ids.append(team.manager_id)
     emotions_records: list[EmotionRecordInTeam] = get_emotion_records_by_user_id(
         db, member_ids, for_team=True, team_id=team_id
     )
 
     # Cria um dicionário para mapear user_id -> user_name
     user_name_map = {user.id: user.name for user in team.members}
+    if team.manager_id and team.manager:
+        user_name_map[team.manager_id] = team.manager.name
     
     # Atribui o user_name correto baseado no user_id, respeitando o anonimato
     for record in emotions_records:
@@ -164,6 +168,21 @@ def update_slack_bot_token(db: Session, team_id: int, bot_token: str | None):
     db.commit()
     db.refresh(db_team)
     logger.debug(f"Slack bot token updated for team {team_id}.")
+    return db_team
+
+
+def update_trello_token(db: Session, team_id: int, token: str | None):
+    """
+    Sets or clears the Trello token for a team.
+    """
+    db_team = db.query(Team).filter(Team.id == team_id).first()
+    if db_team is None:
+        logger.error(f"Team with ID {team_id} not found.")
+        return None
+    db_team.trello_token = token
+    db.commit()
+    db.refresh(db_team)
+    logger.debug(f"Trello token updated for team {team_id}.")
     return db_team
 
 

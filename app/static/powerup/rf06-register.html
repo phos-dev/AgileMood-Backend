@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Registar Sentimento</title>
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           font-size: 14px; background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
+           min-height: 100vh; padding: 12px;
+           display: flex; align-items: center; justify-content: center;
+           color-scheme: light; }
+    .card { background: white; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 20px; width: 100%; }
+    .logo { font-size: 32px; text-align: center; margin-bottom: 4px; }
+    .title { font-size: 16px; font-weight: 700; color: #1f2937; margin: 0 0 4px; }
+    .subtitle { font-size: 12px; color: #6b7280; margin: 0 0 16px; }
+    .title-center { text-align: center; }
+
+    /* Buttons */
+    .btn { width: 100%; padding: 9px 12px; border-radius: 6px; font-size: 13px;
+           font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; }
+    .btn-primary { background: #1d4ed8; color: white; }
+    .btn-primary:hover { background: #1e40af; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .btn-outline { background: transparent; border: 1px solid #1d4ed8; color: #1d4ed8; }
+    .btn-outline:hover { background: #eff6ff; }
+    .btn-green { background: #16a34a; color: white; }
+    .btn-green:hover { background: #15803d; }
+    .btn-green:disabled { background: #86efac; cursor: not-allowed; }
+
+    /* Or divider */
+    .or-div { display: flex; align-items: center; gap: 8px; margin: 12px 0;
+              font-size: 12px; color: #9ca3af; }
+    .or-div::before, .or-div::after { content: ''; flex: 1; border-top: 1px solid #e5e7eb; }
+
+    /* Login form */
+    .field { margin-bottom: 2px; }
+    .field label { display: block; font-size: 12px; font-weight: 500;
+                   color: #374151; margin-bottom: 4px; }
+    .field input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db;
+                   border-radius: 6px; font-size: 13px; color: #1f2937; outline: none; }
+    .field input:focus { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+    .field input.invalid { border-color: #ef4444; }
+    .field-error { font-size: 11px; color: #ef4444; min-height: 18px;
+                   margin: 2px 0 8px; display: block; }
+    .general-error { font-size: 11px; color: #ef4444; text-align: center;
+                     margin-top: 8px; min-height: 16px; }
+
+    /* Emotion grid */
+    .emo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+    .emo-btn { display: flex; flex-direction: column; align-items: center;
+               justify-content: center; aspect-ratio: 1; border-radius: 50%;
+               border: 2px solid #e5e7eb; background: transparent;
+               cursor: pointer; transition: all 0.15s; padding: 0; }
+    .emo-btn .emoji { font-size: 26px; line-height: 1; }
+    .emo-btn .name { font-size: 10px; font-weight: 500; color: #374151;
+                     margin-top: 2px; text-align: center; max-width: 56px;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .emo-btn:hover { border-color: #1d4ed8; }
+
+    /* Slider */
+    .section-label { font-size: 12px; font-weight: 500; color: #374151; margin: 12px 0 4px; }
+    .slider-row { display: flex; align-items: center; gap: 8px; }
+    .slider-lbl { font-size: 11px; color: #6b7280; white-space: nowrap; }
+    .slider-row input[type=range] { flex: 1; accent-color: #1d4ed8; }
+    textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;
+               font-size: 12px; resize: none; height: 52px; font-family: inherit;
+               color: #1f2937; outline: none; }
+    textarea:focus { border-color: #1d4ed8; }
+
+    /* Success */
+    .success-box { text-align: center; padding: 20px 0; }
+    .success-box .check { font-size: 44px; }
+    .success-box .msg { font-size: 15px; font-weight: 700; color: #16a34a; margin: 8px 0 4px; }
+    .success-box .sub { font-size: 12px; color: #6b7280; }
+
+    .warn { color: #d97706; font-size: 12px; text-align: center; padding: 16px 0; }
+    .loading { color: #6b7280; font-size: 12px; text-align: center; padding: 20px 0; }
+    .btn-hint { font-size: 11px; color: #9ca3af; text-align: center; margin: 3px 0 0; }
+    .btn-back { background: none; border: none; color: #1d4ed8; font-size: 12px;
+                cursor: pointer; padding: 0; margin-bottom: 12px; font-weight: 500; }
+    .btn-back:hover { text-decoration: underline; }
+    .identity-bar { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;
+                    padding: 8px 10px; margin-bottom: 12px; }
+    .identity-team { font-size: 12px; color: #0369a1; display: block; font-weight: 600; }
+    .identity-email { font-size: 11px; color: #0369a1; display: block;
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                      max-width: 180px; margin-bottom: 4px; }
+    .identity-actions { display: flex; gap: 8px; }
+    .btn-anon { flex: 1; padding: 5px; background: transparent; border: 1px solid #0369a1;
+                color: #0369a1; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .btn-anon:hover { background: #e0f2fe; }
+    .btn-logout { flex: 1; padding: 5px; background: transparent; border: 1px solid #dc2626;
+                  color: #dc2626; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .btn-logout:hover { background: #fef2f2; }
+  </style>
+</head>
+<body>
+  <div class="card" id="root"></div>
+
+  <script>
+    var t = TrelloPowerUp.iframe();
+    var BASE = window.location.origin;
+    var root = document.getElementById("root");
+    var teamId;
+    var teamName = "";
+
+    function authFetch(url, opts) {
+      return fetch(url, opts).then(function(res) {
+        if (res.status === 401) {
+          t.remove("member", "private", "credentials");
+        }
+        return res;
+      });
+    }
+
+    function showSuccess(isAnon) {
+      root.innerHTML =
+        '<div class="success-box">' +
+        '<div class="check">✅</div>' +
+        '<p class="msg">Sentimento registado!</p>' +
+        '<p class="sub">' + (isAnon ? 'Enviado de forma anônima' : 'Associado à sua conta') + '</p>' +
+        '</div>';
+      setTimeout(function() { t.closePopup(); }, 1500);
+    }
+
+    function logout() {
+      t.remove("member", "private", "credentials").then(showChoiceScreen);
+    }
+
+    function showEmotionForm(emotions, creds, onBack) {
+      var selectedId = null;
+      var html = onBack ? '<button class="btn-back" id="backBtn">← Voltar</button>' : '';
+      if (creds) {
+        html += '<div class="identity-bar">' +
+                '<div style="min-width:0">' +
+                  '<span class="identity-team">Time <strong>' + teamName + '</strong></span>' +
+                  '<span class="identity-email" title="' + creds.email + '">' + creds.email + '</span>' +
+                '</div>' +
+                '<div class="identity-actions" style="flex-shrink:0">' +
+                  '<button class="btn-anon" id="anonBtn">Anônimo</button>' +
+                  '<button class="btn-logout" id="logoutBtn">Sair</button>' +
+                '</div></div>';
+      }
+      html +=
+        '<p class="title">Como você está se sentindo?</p>' +
+        '<p class="subtitle">Selecione a emoção que melhor representa você agora</p>' +
+        '<div class="emo-grid" id="emoGrid">';
+      emotions.forEach(function(e) {
+        html += '<button class="emo-btn" data-id="' + e.id + '" data-color="' + e.color + '">' +
+                '<span class="emoji">' + e.emoji + '</span>' +
+                '<span class="name">' + e.name + '</span>' +
+                '</button>';
+      });
+      html += '</div>' +
+        '<p class="section-label">Intensidade: <span id="iVal">3</span>/5</p>' +
+        '<div class="slider-row">' +
+          '<span class="slider-lbl">Fraco</span>' +
+          '<input type="range" id="iSlider" min="1" max="5" value="3" />' +
+          '<span class="slider-lbl">Forte</span>' +
+        '</div>' +
+        '<p class="section-label">Notas (opcional)</p>' +
+        '<textarea id="notes" maxlength="200" placeholder="Descreva um pouco como você se sente..."></textarea>' +
+        '<button class="btn btn-green" id="submitBtn" style="margin-top:12px" disabled>Registrar</button>' +
+        '<div class="general-error" id="submitErr"></div>';
+
+      root.innerHTML = html;
+
+      if (onBack) {
+        document.getElementById("backBtn").addEventListener("click", onBack);
+      }
+      if (creds) {
+        document.getElementById("anonBtn").addEventListener("click", function() {
+          showEmotionForm(emotions, null, onBack);
+        });
+        document.getElementById("logoutBtn").addEventListener("click", logout);
+      }
+
+      document.getElementById("emoGrid").addEventListener("click", function(ev) {
+        var btn = ev.target.closest(".emo-btn");
+        if (!btn) return;
+        document.querySelectorAll(".emo-btn").forEach(function(b) {
+          b.classList.remove("selected");
+          b.style.borderColor = "#e5e7eb";
+          b.style.background = "transparent";
+        });
+        btn.classList.add("selected");
+        btn.style.borderColor = btn.dataset.color;
+        btn.style.background = btn.dataset.color + "20";
+        selectedId = parseInt(btn.dataset.id);
+        document.getElementById("submitBtn").disabled = false;
+      });
+
+      document.getElementById("iSlider").addEventListener("input", function() {
+        document.getElementById("iVal").textContent = this.value;
+      });
+
+      document.getElementById("submitBtn").addEventListener("click", function() {
+        if (!selectedId) return;
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = "Enviando...";
+        var payload = {
+          emotion_id: selectedId,
+          intensity: parseInt(document.getElementById("iSlider").value),
+          notes: document.getElementById("notes").value.trim() || null,
+          is_anonymous: !creds,
+        };
+
+        var promise;
+        if (creds) {
+          var opts = {
+            method: "POST",
+            headers: { Authorization: "Bearer " + creds.token, "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          };
+          promise = authFetch(BASE + "/emotion_record/", opts);
+        } else {
+          promise = fetch(BASE + "/emotion_record/public?team_id=" + teamId, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        }
+
+        promise
+          .then(function(res) {
+            if (res.status === 401) { showChoiceScreen(); return null; }
+            if (!res.ok) throw new Error("Erro " + res.status);
+            return res.json();
+          })
+          .then(function(data) { if (data !== null) showSuccess(!creds); })
+          .catch(function() {
+            document.getElementById("submitErr").textContent = "Erro ao registar. Tente novamente.";
+            btn.disabled = false;
+            btn.textContent = "Registrar";
+          });
+      });
+    }
+
+    function loadEmotions(creds, onBack) {
+      root.innerHTML = '<p class="loading">A carregar emoções...</p>';
+
+      fetch(BASE + "/emotions/public?team_id=" + teamId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var emotions = Array.isArray(data) ? data : (data.emotions || []);
+          if (!emotions.length) {
+            root.innerHTML = '<p class="warn">Nenhuma emoção configurada para esta equipe.</p>';
+            return;
+          }
+          showEmotionForm(emotions, creds, onBack);
+        })
+        .catch(function() {
+          root.innerHTML = '<p class="warn">Erro ao carregar emoções. Verifique a configuração.</p>';
+        });
+    }
+
+    function showLoginForm(onSuccess, onBack) {
+      root.innerHTML =
+        (onBack ? '<button class="btn-back" id="backBtn">← Voltar</button>' : '') +
+        '<div class="logo">🎯</div>' +
+        '<p class="title title-center">Bem-vindo de volta!</p>' +
+        '<p class="subtitle title-center">Entre com sua conta AgileMood</p>' +
+        '<div class="field">' +
+          '<label>E-mail</label>' +
+          '<input type="email" id="loginEmail" placeholder="gestor@exemplo.com" autocomplete="email" />' +
+          '<span class="field-error" id="emailErr"></span>' +
+        '</div>' +
+        '<div class="field">' +
+          '<label>Senha</label>' +
+          '<input type="password" id="loginPwd" placeholder="••••••••" autocomplete="current-password" />' +
+          '<span class="field-error" id="pwdErr"></span>' +
+        '</div>' +
+        '<button class="btn btn-primary" id="loginBtn" style="margin-top:4px">Entrar</button>' +
+        '<div class="general-error" id="loginErr"></div>';
+
+      if (onBack) {
+        document.getElementById("backBtn").addEventListener("click", onBack);
+      }
+
+      document.getElementById("loginBtn").addEventListener("click", function() {
+        var email = document.getElementById("loginEmail").value.trim();
+        var pwd = document.getElementById("loginPwd").value;
+        var emailErr = document.getElementById("emailErr");
+        var pwdErr = document.getElementById("pwdErr");
+        var loginErr = document.getElementById("loginErr");
+        var btn = document.getElementById("loginBtn");
+
+        emailErr.textContent = ""; pwdErr.textContent = ""; loginErr.textContent = "";
+        document.getElementById("loginEmail").classList.remove("invalid");
+        document.getElementById("loginPwd").classList.remove("invalid");
+
+        var valid = true;
+        if (!email) {
+          emailErr.textContent = "Informe seu e-mail";
+          document.getElementById("loginEmail").classList.add("invalid");
+          valid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          emailErr.textContent = "E-mail inválido";
+          document.getElementById("loginEmail").classList.add("invalid");
+          valid = false;
+        }
+        if (!pwd) {
+          pwdErr.textContent = "Informe sua senha";
+          document.getElementById("loginPwd").classList.add("invalid");
+          valid = false;
+        }
+        if (!valid) return;
+
+        btn.disabled = true;
+        btn.textContent = "Entrando...";
+        var form = new URLSearchParams();
+        form.append("username", email);
+        form.append("password", pwd);
+
+        fetch(BASE + "/user/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        }).then(function(r) {
+          if (!r.ok) throw new Error("auth");
+          return r.json();
+        }).then(function(data) {
+          var creds = { email: email, token: data.access_token };
+          return t.set("member", "private", "credentials", creds).then(function() {
+            onSuccess(creds);
+          });
+        }).catch(function(err) {
+          if (err.message === "auth") {
+            pwdErr.textContent = "E-mail ou senha incorretos";
+            document.getElementById("loginPwd").classList.add("invalid");
+          } else {
+            loginErr.textContent = "Erro ao conectar. Tente novamente.";
+          }
+          btn.disabled = false;
+          btn.textContent = "Entrar";
+        });
+      });
+    }
+
+    function showChoiceScreen() {
+      root.innerHTML =
+        '<div class="logo">🎯</div>' +
+        '<p class="title title-center">Como você está se sentindo?</p>' +
+        '<p class="subtitle title-center">Registre seu sentimento hoje</p>' +
+        '<button class="btn btn-outline" id="guestBtn">Registrar sem conta</button>' +
+        '<p class="btn-hint">Anônimo, sem precisar de login</p>' +
+        '<div class="or-div">ou</div>' +
+        '<button class="btn btn-primary" id="loginBtn">Entrar com minha conta</button>' +
+        '<p class="btn-hint">Para associar ao seu perfil</p>';
+
+      document.getElementById("guestBtn").addEventListener("click", function() {
+        loadEmotions(null, showChoiceScreen);
+      });
+      document.getElementById("loginBtn").addEventListener("click", function() {
+        showLoginForm(function(creds) { loadEmotions(creds); }, showChoiceScreen);
+      });
+    }
+
+    Promise.all([
+      t.get("board", "private", "settings"),
+      t.get("member", "private", "credentials"),
+    ]).then(function(results) {
+      var boardSettings = results[0];
+      var creds = results[1];
+
+      if (!boardSettings || !boardSettings.teamId) {
+        root.innerHTML = '<p class="warn">Power-Up não configurado. O gestor deve acessar as Configurações.</p>';
+        return;
+      }
+      teamId = boardSettings.teamId;
+
+      fetch(BASE + "/teams/public/" + teamId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) { teamName = data.name || ("#" + teamId); })
+        .catch(function() { teamName = "#" + teamId; })
+        .then(function() {
+          if (creds && creds.token) {
+            loadEmotions(creds);
+          } else {
+            showChoiceScreen();
+          }
+        });
+    });
+  </script>
+</body>
+</html>

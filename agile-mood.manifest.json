@@ -1,0 +1,39 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "21e362ce-075a-4a0d-bee4-465d770c7015",
+  "developer": {
+    "name": "AgileMood",
+    "websiteUrl": "http://localhost:3000",
+    "privacyUrl": "http://localhost:3000/privacy",
+    "termsOfUseUrl": "http://localhost:3000/terms"
+  },
+  "name": {
+    "short": "AgileMood",
+    "full": "AgileMood - Team Mood Tracker"
+  },
+  "description": {
+    "short": "Weekly mood reports and check-in reminders for agile teams.",
+    "full": "AgileMood sends weekly mood report summaries to team managers and check-in reminders to team members via Microsoft Teams."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#4F46E5",
+  "bots": [
+    {
+      "botId": "21e362ce-075a-4a0d-bee4-465d770c7015",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": true
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": [],
+  "webApplicationInfo": {
+    "id": "21e362ce-075a-4a0d-bee4-465d770c7015",
+    "resource": "https://graph.microsoft.com"
+  }
+}

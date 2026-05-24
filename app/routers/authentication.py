@@ -17,7 +17,7 @@ from app.utils.constants import Errors, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPI
 from app.utils.logger import logger
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
 
 
 def create_access_token(data: dict | None = None):
