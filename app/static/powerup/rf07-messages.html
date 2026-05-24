@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Mensagens Recebidas</title>
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           font-size: 14px; background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
+           min-height: 100vh; padding: 12px;
+           display: flex; align-items: center; justify-content: center;
+           color-scheme: light; }
+    .card { background: white; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 20px; width: 100%;
+            min-height: 200px; }
+    .logo { font-size: 32px; text-align: center; margin-bottom: 4px; }
+    .title { font-size: 16px; font-weight: 700; color: #1f2937; margin: 0 0 4px; }
+    .subtitle { font-size: 12px; color: #6b7280; margin: 0 0 16px; }
+    .title-center { text-align: center; }
+
+    .field { margin-bottom: 2px; }
+    .field label { display: block; font-size: 12px; font-weight: 500;
+                   color: #374151; margin-bottom: 4px; }
+    .field input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db;
+                   border-radius: 6px; font-size: 13px; color: #1f2937; outline: none; }
+    .field input:focus { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+    .field input.invalid { border-color: #ef4444; }
+    .field-error { font-size: 11px; color: #ef4444; min-height: 18px;
+                   margin: 2px 0 8px; display: block; }
+    .general-error { font-size: 11px; color: #ef4444; text-align: center;
+                     margin-top: 8px; min-height: 16px; }
+
+    .btn { width: 100%; padding: 9px 12px; border-radius: 6px; font-size: 13px;
+           font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; }
+    .btn-primary { background: #1d4ed8; color: white; }
+    .btn-primary:hover { background: #1e40af; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    /* Messages */
+    .msg-card { border: 1px solid #e5e7eb; border-radius: 8px;
+                padding: 10px 12px; margin-bottom: 8px; background: #f9fafb; overflow: hidden; }
+    .msg-meta { font-size: 11px; color: #9ca3af; margin-bottom: 4px; }
+    .msg-body { font-size: 13px; color: #1f2937;
+                overflow-wrap: break-word; word-break: break-word; }
+    .anon-tag { background: #e5e7eb; border-radius: 4px;
+                padding: 1px 6px; font-size: 10px; font-weight: 500; color: #6b7280; }
+    .empty { color: #9ca3af; font-style: italic; text-align: center; padding: 16px 0; font-size: 13px; }
+    .warn { color: #d97706; font-size: 12px; text-align: center; padding: 16px 0; }
+    .loading { color: #6b7280; font-size: 12px; text-align: center; padding: 20px 0; }
+    .identity-bar { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;
+                    padding: 8px 10px; margin-bottom: 12px; display: flex;
+                    align-items: center; justify-content: space-between; gap: 8px; }
+    .identity-team { font-size: 12px; color: #0369a1; display: block; font-weight: 600; }
+    .identity-email { font-size: 11px; color: #0369a1; display: block;
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                      max-width: 180px; }
+    .btn-logout { padding: 4px 8px; background: transparent; border: 1px solid #dc2626;
+                  color: #dc2626; border-radius: 5px; font-size: 11px; font-weight: 600;
+                  cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .btn-logout:hover { background: #fef2f2; }
+  </style>
+</head>
+<body>
+  <div class="card" id="root"></div>
+
+  <script>
+    var t = TrelloPowerUp.iframe();
+    var BASE = window.location.origin;
+    var root = document.getElementById("root");
+    var teamName = "";
+
+    function authFetch(url, opts) {
+      return fetch(url, opts).then(function(res) {
+        if (res.status === 401) {
+          t.remove("member", "private", "credentials");
+        }
+        return res;
+      });
+    }
+
+    function logout() {
+      t.remove("member", "private", "credentials").then(function() {
+        showLoginForm(checkRoleAndShow);
+      });
+    }
+
+    function checkRoleAndShow(creds) {
+      fetch(BASE + "/user/logged", {
+        headers: { Authorization: "Bearer " + creds.token }
+      }).then(function(r) { return r.json(); })
+        .then(function(user) {
+          if (user.role !== "manager") {
+            showLoginForm(checkRoleAndShow, "Esta área é exclusiva para gestores.");
+          } else {
+            showMessages(creds);
+          }
+        }).catch(function() {
+          showLoginForm(checkRoleAndShow, "Erro ao verificar conta. Tente novamente.");
+        });
+    }
+
+    function showMessages(creds) {
+      root.innerHTML =
+        '<p class="title">Mensagens Recebidas</p>' +
+        '<div class="identity-bar">' +
+          '<div style="min-width:0">' +
+            '<span class="identity-team">Time <strong>' + teamName + '</strong></span>' +
+            '<span class="identity-email" title="' + creds.email + '">' + creds.email + '</span>' +
+          '</div>' +
+          '<button class="btn-logout" id="logoutBtn">Sair</button>' +
+        '</div>' +
+        '<div id="content"><p class="loading">A carregar...</p></div>';
+
+      document.getElementById("logoutBtn").addEventListener("click", logout);
+
+      authFetch(BASE + "/feedback/", { headers: { Authorization: "Bearer " + creds.token } })
+        .then(function(res) {
+          if (res.status === 401) { showLoginForm(checkRoleAndShow, "Sessão expirada. Por favor, entre novamente."); return null; }
+          if (!res.ok) throw new Error("Erro " + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          if (data === null) return;
+          var items = Array.isArray(data) ? data : (data.feedbacks || data.items || []);
+          var content = document.getElementById("content");
+
+          if (!items.length) {
+            content.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📭</div>Sem mensagens recebidas.</div>';
+            return;
+          }
+
+          var html = "";
+          items.slice(0, 20).forEach(function(fb) {
+            var date = fb.created_at ? new Date(fb.created_at).toLocaleDateString("pt-BR") : "";
+            var anon = fb.is_anonymous ? '<span class="anon-tag">Anônimo</span> ' : "";
+            html += '<div class="msg-card">' +
+                    '<div class="msg-meta">' + anon + date + '</div>' +
+                    '<div class="msg-body">' + (fb.message || "") + '</div>' +
+                    '</div>';
+          });
+          content.innerHTML = html;
+        })
+        .catch(function(err) {
+          document.getElementById("content").innerHTML =
+            '<p class="warn">Erro ao carregar mensagens: ' + err.message + '</p>';
+        });
+    }
+
+    function showLoginForm(onSuccess, errorMsg) {
+      root.innerHTML =
+        '<div class="logo">🎯</div>' +
+        '<p class="title title-center">Bem-vindo de volta!</p>' +
+        '<p class="subtitle title-center">Entre com sua conta AgileMood</p>' +
+        (errorMsg ? '<p class="general-error" style="margin-bottom:8px">' + errorMsg + '</p>' : '') +
+        '<div class="field">' +
+          '<label>E-mail</label>' +
+          '<input type="email" id="loginEmail" placeholder="gestor@exemplo.com" autocomplete="email" />' +
+          '<span class="field-error" id="emailErr"></span>' +
+        '</div>' +
+        '<div class="field">' +
+          '<label>Senha</label>' +
+          '<input type="password" id="loginPwd" placeholder="••••••••" autocomplete="current-password" />' +
+          '<span class="field-error" id="pwdErr"></span>' +
+        '</div>' +
+        '<button class="btn btn-primary" id="loginBtn" style="margin-top:4px">Entrar</button>' +
+        '<div class="general-error" id="loginErr"></div>';
+
+      document.getElementById("loginBtn").addEventListener("click", function() {
+        var email = document.getElementById("loginEmail").value.trim();
+        var pwd = document.getElementById("loginPwd").value;
+        var emailErr = document.getElementById("emailErr");
+        var pwdErr = document.getElementById("pwdErr");
+        var loginErr = document.getElementById("loginErr");
+        var btn = document.getElementById("loginBtn");
+
+        emailErr.textContent = ""; pwdErr.textContent = ""; loginErr.textContent = "";
+        document.getElementById("loginEmail").classList.remove("invalid");
+        document.getElementById("loginPwd").classList.remove("invalid");
+
+        var valid = true;
+        if (!email) {
+          emailErr.textContent = "Informe seu e-mail";
+          document.getElementById("loginEmail").classList.add("invalid");
+          valid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          emailErr.textContent = "E-mail inválido";
+          document.getElementById("loginEmail").classList.add("invalid");
+          valid = false;
+        }
+        if (!pwd) {
+          pwdErr.textContent = "Informe sua senha";
+          document.getElementById("loginPwd").classList.add("invalid");
+          valid = false;
+        }
+        if (!valid) return;
+
+        btn.disabled = true;
+        btn.textContent = "Entrando...";
+        var form = new URLSearchParams();
+        form.append("username", email);
+        form.append("password", pwd);
+
+        fetch(BASE + "/user/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        }).then(function(r) {
+          if (!r.ok) throw new Error("auth");
+          return r.json();
+        }).then(function(data) {
+          var creds = { email: email, token: data.access_token };
+          return t.set("member", "private", "credentials", creds).then(function() {
+            onSuccess(creds);
+          });
+        }).catch(function(err) {
+          if (err.message === "auth") {
+            pwdErr.textContent = "E-mail ou senha incorretos";
+            document.getElementById("loginPwd").classList.add("invalid");
+          } else {
+            loginErr.textContent = "Erro ao conectar. Tente novamente.";
+          }
+          btn.disabled = false;
+          btn.textContent = "Entrar";
+        });
+      });
+    }
+
+    Promise.all([
+      t.get("board", "private", "settings"),
+      t.get("member", "private", "credentials"),
+    ]).then(function(results) {
+      var boardSettings = results[0];
+      var creds = results[1];
+
+      if (!boardSettings || !boardSettings.teamId) {
+        root.innerHTML = '<p class="warn">Power-Up não configurado. O gestor deve acessar as Configurações.</p>';
+        return;
+      }
+
+      fetch(BASE + "/teams/public/" + boardSettings.teamId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) { teamName = data.name || ("#" + boardSettings.teamId); })
+        .catch(function() { teamName = "#" + boardSettings.teamId; })
+        .then(function() {
+          if (creds && creds.token) {
+            checkRoleAndShow(creds);
+          } else {
+            showLoginForm(checkRoleAndShow);
+          }
+        });
+    });
+  </script>
+</body>
+</html>

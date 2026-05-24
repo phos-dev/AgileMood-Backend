@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard de Humor</title>
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           font-size: 14px; background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
+           min-height: 100vh; padding: 12px;
+           display: flex; align-items: center; justify-content: center;
+           color-scheme: light; }
+    .card { background: white; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 20px; width: 100%; }
+    .logo { font-size: 32px; text-align: center; margin-bottom: 4px; }
+    .title { font-size: 16px; font-weight: 700; color: #1f2937; margin: 0 0 4px; }
+    .subtitle { font-size: 12px; color: #6b7280; margin: 0 0 16px; }
+    .title-center { text-align: center; }
+
+    .field { margin-bottom: 2px; }
+    .field label { display: block; font-size: 12px; font-weight: 500;
+                   color: #374151; margin-bottom: 4px; }
+    .field input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db;
+                   border-radius: 6px; font-size: 13px; color: #1f2937; outline: none; }
+    .field input:focus { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+    .field input.invalid { border-color: #ef4444; }
+    .field-error { font-size: 11px; color: #ef4444; min-height: 18px;
+                   margin: 2px 0 8px; display: block; }
+    .general-error { font-size: 11px; color: #ef4444; text-align: center;
+                     margin-top: 8px; min-height: 16px; }
+
+    .btn { width: 100%; padding: 9px 12px; border-radius: 6px; font-size: 13px;
+           font-weight: 600; cursor: pointer; border: none; transition: background 0.15s; }
+    .btn-primary { background: #1d4ed8; color: white; }
+    .btn-primary:hover { background: #1e40af; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    /* Dashboard */
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
+    .filters label { font-size: 12px; font-weight: 500; color: #374151; }
+    .filters input[type=date] { padding: 5px 8px; border: 1px solid #d1d5db;
+                                border-radius: 6px; font-size: 12px; margin-top: 3px;
+                                display: block; outline: none; }
+    .filter-btn { padding: 7px 14px; background: #1d4ed8; color: white; border: none;
+                  border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .filter-btn:hover { background: #1e40af; }
+    .section { margin-top: 14px; }
+    .section h4 { font-size: 13px; font-weight: 600; color: #374151; margin: 0 0 8px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; color: #374151; }
+    .bar { height: 10px; background: #1d4ed8; border-radius: 4px; min-width: 4px; }
+    .alert-ok { color: #16a34a; } .alert-note { color: #1d4ed8; }
+    .alert-warning { color: #d97706; } .alert-critical { color: #dc2626; }
+    .warn { color: #d97706; font-size: 12px; text-align: center; padding: 16px 0; }
+    .loading { color: #6b7280; font-size: 12px; text-align: center; padding: 16px 0; }
+    .btn-logout { background: none; border: none; font-size: 11px; color: #6b7280;
+                  cursor: pointer; padding: 0; text-decoration: underline; }
+    .btn-logout:hover { color: #1f2937; }
+    .user-bar { display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 10px; font-size: 12px; color: #6b7280; }
+    .user-bar span { flex: 1; min-width: 0; overflow: hidden;
+                     text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="card" id="root"></div>
+
+  <script>
+    var t = TrelloPowerUp.iframe();
+    var BASE = window.location.origin;
+    var root = document.getElementById("root");
+    var teamId;
+
+    function authFetch(url, opts) {
+      return fetch(url, opts).then(function(res) {
+        if (res.status === 401) {
+          t.remove("member", "private", "credentials");
+        }
+        return res;
+      });
+    }
+
+    function fmt(d) { return d.toISOString().split("T")[0]; }
+
+    function classifyAlert(ratio) {
+      if (ratio > 50) return "critical";
+      if (ratio > 30) return "warning";
+      if (ratio > 15) return "note";
+      return "ok";
+    }
+    function alertLabel(l) {
+      return { ok: "Normal", note: "Observação", warning: "Atenção", critical: "Crítico" }[l] || l;
+    }
+
+    function showDashboard(creds, user) {
+      var now = new Date();
+      var week = new Date(now); week.setDate(week.getDate() - 7);
+
+      root.innerHTML =
+        '<div class="user-bar">' +
+          '<span>Logado como <strong>' + user.email + '</strong> · Time ' + teamId + '</span>' +
+          '<button class="btn-logout" id="logoutBtn">Sair</button>' +
+        '</div>' +
+        '<p class="title">Dashboard de Humor da Equipe</p>' +
+        '<div class="filters">' +
+          '<label>De<input type="date" id="startDate" value="' + fmt(week) + '" /></label>' +
+          '<label>Até<input type="date" id="endDate" value="' + fmt(now) + '" /></label>' +
+          '<button class="filter-btn" id="loadBtn">Carregar</button>' +
+        '</div>' +
+        '<div id="content"><p class="loading">Configure o período e clique em Carregar.</p></div>';
+
+      document.getElementById("logoutBtn").addEventListener("click", function() {
+        t.remove("member", "private", "credentials").then(function() {
+          showLoginForm(checkRoleAndShow);
+        });
+      });
+
+      document.getElementById("loadBtn").addEventListener("click", function() {
+        var start = document.getElementById("startDate").value;
+        var end = document.getElementById("endDate").value;
+        var qs = "?start_date=" + start + "&end_date=" + end;
+        var content = document.getElementById("content");
+        content.innerHTML = '<p class="loading">A carregar...</p>';
+
+        var h = { Authorization: "Bearer " + creds.token };
+        Promise.all([
+          authFetch(BASE + "/reports/emoji-distribution/" + teamId + qs, { headers: Object.assign({}, h) }).then(function(r) {
+            if (r.status === 401) return { _expired: true };
+            return r.json();
+          }),
+          authFetch(BASE + "/reports/average-intensity/" + teamId + qs, { headers: Object.assign({}, h) }).then(function(r) {
+            if (r.status === 401) return { _expired: true };
+            return r.json();
+          }),
+        ]).then(function(results) {
+          var dist = results[0], intensity = results[1];
+          if (dist._expired) {
+            showLoginForm(checkRoleAndShow, "Sessão expirada. Por favor, entre novamente.");
+            return;
+          }
+          if (dist.detail) { content.innerHTML = '<p class="warn">Sem permissão para visualizar o dashboard.</p>'; return; }
+          var ratio = dist.negative_emotion_ratio || 0;
+          var level = classifyAlert(ratio);
+          var rows = dist.emoji_distribution || [];
+          var maxF = rows.reduce(function(m, r) { return Math.max(m, r.frequency); }, 1);
+
+          var html = '<div class="section"><h4>Alerta: <span class="alert-' + level + '">' +
+                     alertLabel(level) + ' (' + ratio.toFixed(1) + '% negativas)</span></h4></div>';
+
+          if (!rows.length) {
+            html += '<p style="color:#6b7280;font-size:12px"><em>Nenhum registo neste período.</em></p>';
+          } else {
+            html += '<div class="section"><h4>Distribuição de Emoções</h4>';
+            rows.slice(0, 10).forEach(function(r) {
+              var w = Math.round((r.frequency / maxF) * 150);
+              html += '<div class="bar-row"><span style="width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + r.emotion_name + '">' + r.emotion_name + '</span>' +
+                      '<div class="bar" style="width:' + w + 'px"></div>' +
+                      '<span>' + r.frequency + '</span></div>';
+            });
+            html += '</div>';
+
+            var iRows = (intensity.average_intensity || []).slice(0, 10);
+            if (iRows.length) {
+              html += '<div class="section"><h4>Intensidade Média</h4>';
+              iRows.forEach(function(r) {
+                var w = Math.round((r.avg_intensity / 5) * 150);
+                html += '<div class="bar-row"><span style="width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.emotion_name + '</span>' +
+                        '<div class="bar" style="width:' + w + 'px;background:#16a34a"></div>' +
+                        '<span>' + r.avg_intensity.toFixed(1) + '</span></div>';
+              });
+              html += '</div>';
+            }
+          }
+          html += '<p style="font-size:11px;color:#9ca3af;margin-top:12px">🛡 Dados agregados. Nenhuma informação individual exibida.</p>';
+          content.innerHTML = html;
+        }).catch(function() {
+          content.innerHTML = '<p class="warn">Erro ao carregar relatórios. Verifique a configuração.</p>';
+        });
+      });
+    }
+
+    function showLoginForm(onSuccess, errorMsg) {
+      root.innerHTML =
+        '<div class="logo">🎯</div>' +
+        '<p class="title title-center">Bem-vindo de volta!</p>' +
+        '<p class="subtitle title-center">Entre com sua conta AgileMood</p>' +
+        (errorMsg ? '<p class="general-error" style="margin-bottom:8px">' + errorMsg + '</p>' : '') +
+        '<div class="field">' +
+          '<label>E-mail</label>' +
+          '<input type="email" id="loginEmail" placeholder="gestor@exemplo.com" autocomplete="email" />' +
+          '<span class="field-error" id="emailErr"></span>' +
+        '</div>' +
+        '<div class="field">' +
+          '<label>Senha</label>' +
+          '<input type="password" id="loginPwd" placeholder="••••••••" autocomplete="current-password" />' +
+          '<span class="field-error" id="pwdErr"></span>' +
+        '</div>' +
+        '<button class="btn btn-primary" id="loginBtn" style="margin-top:4px">Entrar</button>' +
+        '<div class="general-error" id="loginErr"></div>';
+
+      document.getElementById("loginBtn").addEventListener("click", function() {
+        var email = document.getElementById("loginEmail").value.trim();
+        var pwd = document.getElementById("loginPwd").value;
+        var emailErr = document.getElementById("emailErr");
+        var pwdErr = document.getElementById("pwdErr");
+        var loginErr = document.getElementById("loginErr");
+        var btn = document.getElementById("loginBtn");
+
+        emailErr.textContent = ""; pwdErr.textContent = ""; loginErr.textContent = "";
+        document.getElementById("loginEmail").classList.remove("invalid");
+        document.getElementById("loginPwd").classList.remove("invalid");
+
+        var valid = true;
+        if (!email) {
+          emailErr.textContent = "Informe seu e-mail";
+          document.getElementById("loginEmail").classList.add("invalid");
+          valid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          emailErr.textContent = "E-mail inválido";
+          document.getElementById("loginEmail").classList.add("invalid");
+          valid = false;
+        }
+        if (!pwd) {
+          pwdErr.textContent = "Informe sua senha";
+          document.getElementById("loginPwd").classList.add("invalid");
+          valid = false;
+        }
+        if (!valid) return;
+
+        btn.disabled = true;
+        btn.textContent = "Entrando...";
+        var form = new URLSearchParams();
+        form.append("username", email);
+        form.append("password", pwd);
+
+        fetch(BASE + "/user/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        }).then(function(r) {
+          if (!r.ok) throw new Error("auth");
+          return r.json();
+        }).then(function(data) {
+          var creds = { email: email, token: data.access_token };
+          return t.set("member", "private", "credentials", creds).then(function() {
+            onSuccess(creds);
+          });
+        }).catch(function(err) {
+          if (err.message === "auth") {
+            pwdErr.textContent = "E-mail ou senha incorretos";
+            document.getElementById("loginPwd").classList.add("invalid");
+          } else {
+            loginErr.textContent = "Erro ao conectar. Tente novamente.";
+          }
+          btn.disabled = false;
+          btn.textContent = "Entrar";
+        });
+      });
+    }
+
+    function checkRoleAndShow(creds) {
+      fetch(BASE + "/user/logged", {
+        headers: { Authorization: "Bearer " + creds.token }
+      }).then(function(r) { return r.json(); })
+        .then(function(user) {
+          if (user.role !== "manager") {
+            showLoginForm(checkRoleAndShow, "Este dashboard é exclusivo para gestores.");
+          } else {
+            showDashboard(creds, user);
+          }
+        }).catch(function() {
+          showLoginForm(checkRoleAndShow, "Erro ao verificar conta. Tente novamente.");
+        });
+    }
+
+    Promise.all([
+      t.get("board", "private", "settings"),
+      t.get("member", "private", "credentials"),
+    ]).then(function(results) {
+      var boardSettings = results[0];
+      var creds = results[1];
+
+      if (!boardSettings || !boardSettings.teamId) {
+        root.innerHTML = '<p class="warn">Power-Up não configurado. O gestor deve acessar as Configurações.</p>';
+        return;
+      }
+      teamId = boardSettings.teamId;
+
+      if (creds && creds.token) {
+        checkRoleAndShow(creds);
+      } else {
+        showLoginForm(checkRoleAndShow);
+      }
+    });
+  </script>
+</body>
+</html>

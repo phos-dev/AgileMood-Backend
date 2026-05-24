@@ -188,14 +188,16 @@ def get_anonymous_emotion_analysis(
 
 
 def build_emotion_filter(team_id: int, start_date: str | None, end_date: str | None):
+    from datetime import timedelta
     filters = [Emotion.team_id == team_id]
 
     if start_date and end_date:
-        filters.append(EmotionRecord.created_at.between(start_date, end_date))
+        filters.append(EmotionRecord.created_at >= start_date)
+        filters.append(EmotionRecord.created_at < end_date + timedelta(days=1))
     elif start_date:
         filters.append(EmotionRecord.created_at >= start_date)
     elif end_date:
-        filters.append(EmotionRecord.created_at <= end_date)
+        filters.append(EmotionRecord.created_at < end_date + timedelta(days=1))
 
     return filters
 

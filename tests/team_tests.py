@@ -15,7 +15,7 @@ mock_member = MagicMock(id=2, email="employee@example.com", role="employee", ava
 mock_member.name = "Employee"
 mock_manager_orm = MagicMock(id=1, email="manager@example.com", role="manager", avatar=None, slack_user_id=None, teams_user_id=None)
 mock_manager_orm.name = "Manager"
-_mock_team_data = MagicMock(id=1, manager_id=1, slack_bot_token=None, teams_tenant_id=None)
+_mock_team_data = MagicMock(id=1, manager_id=1, slack_bot_token=None, teams_tenant_id=None, trello_token=None)
 _mock_team_data.name = "Test Team"
 mock_team = {
     "team_data": _mock_team_data,

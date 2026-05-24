@@ -1,6 +1,6 @@
 import os
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import Annotated
@@ -14,12 +14,23 @@ from app.utils.logger import logger
 from app.crud import team_crud
 from app.crud import emotion_crud
 from app.crud import user_crud
+from app.core.rate_limiter import limiter
 from app.routers.authentication import get_current_active_user
 
 router = APIRouter(
     prefix="/teams",
     tags=["teams"],
 )
+
+
+@router.get("/public/{team_id}")
+@limiter.limit("60/minute")
+def get_team_name_public(request: Request, team_id: int, db: Session = Depends(get_db)):
+    from app.schemas.team_schema import Team as TeamSchema
+    team = db.query(TeamSchema).filter(TeamSchema.id == team_id).first()
+    if not team:
+        raise Errors.NOT_FOUND
+    return {"id": team.id, "name": team.name}
 
 
 @router.post("/", response_model=TeamData)

@@ -1,5 +1,6 @@
 import httpx
 from app.utils.logger import logger
+from app.databases.postgres_database import SessionLocal
 
 
 ALERT_EMOJI_MAP = {
@@ -256,6 +257,50 @@ def build_weekly_report_blocks(
     })
 
     return blocks
+
+
+async def send_sprint_end_reminder(team_id: int) -> None:
+    """
+    Sends an RF01 reminder DM via Slack to all members of a team when a sprint ends.
+    Creates its own DB session (called as a background task from the webhook handler).
+    """
+    from app.schemas.team_schema import Team as TeamSchema  # local import avoids circular dependency
+
+    db = SessionLocal()
+    try:
+        team = db.query(TeamSchema).filter(TeamSchema.id == team_id).first()
+        if not team or not team.slack_bot_token:
+            logger.warning(f"Sprint-end reminder skipped for team {team_id}: no Slack bot token.")
+            return
+
+        unreachable = []
+        reminder_blocks = build_reminder_blocks()
+
+        for member in team.members:
+            slack_id = await resolve_slack_user(team.slack_bot_token, member)
+            if slack_id:
+                success = await send_dm(team.slack_bot_token, slack_id, reminder_blocks)
+                if not success:
+                    logger.warning(f"Failed to send sprint-end reminder DM to {member.email}")
+            else:
+                unreachable.append(member.email)
+
+        if unreachable:
+            manager_slack_id = await resolve_slack_user(team.slack_bot_token, team.manager)
+            if manager_slack_id:
+                notification_blocks = build_unreachable_notification_blocks(unreachable)
+                await send_dm(team.slack_bot_token, manager_slack_id, notification_blocks)
+            else:
+                logger.error(
+                    f"Manager of team {team_id} is also unreachable. "
+                    f"Cannot send sprint-end unreachable notification."
+                )
+
+        logger.debug(f"Sprint-end reminders sent for team {team_id}.")
+    except Exception as exc:
+        logger.error(f"Error sending sprint-end reminders for team {team_id}: {exc}", exc_info=True)
+    finally:
+        db.close()
 
 
 def build_no_data_blocks(team_name: str, start_date: str, end_date: str) -> list[dict]:
