@@ -18,6 +18,7 @@ from app.routers.reports_router import router as reports_router
 from app.routers.feedback_router import router as feedback_router
 from app.routers.auth_router import router as auth_router
 from app.routers.trello_router import router as trello_router
+from app.routers.jira_router import router as jira_router
 from app.routers.teams_router import router as teams_router
 from app.services.report_scheduler import create_scheduler
 from dotenv import load_dotenv
@@ -58,6 +59,7 @@ app.include_router(reports_router)
 app.include_router(feedback_router)
 app.include_router(auth_router)
 app.include_router(trello_router)
+app.include_router(jira_router)
 app.include_router(teams_router)
 
 app.mount("/powerup", StaticFiles(directory="app/static/powerup", html=True), name="powerup")
