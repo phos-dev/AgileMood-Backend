@@ -5,7 +5,7 @@ import os
 import time
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, HTTPException, Request, Response
 from fastapi.routing import APIRouter
 from sqlalchemy.orm import Session
 
@@ -89,13 +89,16 @@ def jira_disconnect(
     return {"message": f"Jira integration removed for team {team_id}."}
 
 
-@router.post("/webhooks/jira/sprint-end")
+@router.api_route("/webhooks/jira/sprint-end", methods=["POST", "HEAD"])
 async def jira_sprint_end(
     team_id: int,
     request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+
     body = await request.body()
     signature = request.headers.get("x-jira-signature")
     if not _verify_jira_signature(body, signature):

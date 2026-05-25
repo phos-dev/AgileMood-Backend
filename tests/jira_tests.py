@@ -153,6 +153,11 @@ def test_employee_cannot_disconnect_jira():
 
 # ---- webhook ----
 
+def test_webhook_head_returns_200():
+    resp = client.head("/webhooks/jira/sprint-end?team_id=1")
+    assert resp.status_code == 200
+
+
 _SPRINT_CLOSED = {
     "webhookEvent": "jira:sprint_closed",
     "sprint": {"id": 42, "name": "Sprint 3", "state": "closed"},
