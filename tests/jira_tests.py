@@ -8,31 +8,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models.user_model import UserInDB, Role
+from app.models.user_model import UserInDB
+from app.utils.constants import Role
 from app.routers.authentication import create_access_token
 
 client = TestClient(app)
 
 # --- shared fixtures ---
 manager_user = UserInDB(
-    id=1,
-    email="manager@example.com",
-    role=Role.MANAGER,
-    name="Manager",
-    teams=[],
-    managed_teams=[],
-    slack_user_id=None,
-    teams_user_id=None,
+    id=1, name="Manager", email="manager@example.com",
+    disabled=False, role=Role.MANAGER, hashed_password="x",
 )
 employee_user = UserInDB(
-    id=2,
-    email="employee@example.com",
-    role=Role.EMPLOYEE,
-    name="Employee",
-    teams=[],
-    managed_teams=[],
-    slack_user_id=None,
-    teams_user_id=None,
+    id=2, name="Employee", email="employee@example.com",
+    disabled=False, role=Role.EMPLOYEE, hashed_password="x",
 )
 
 _mock_team_data = MagicMock(
