@@ -20,6 +20,8 @@ class TeamData(Team):
     slack_bot_token: Optional[str] = None
     teams_tenant_id: Optional[str] = None
     trello_token: Optional[str] = None
+    jira_token: Optional[str] = None
+    jira_cloud_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -31,6 +33,7 @@ class TeamDataSafe(Team):
     manager_id: int | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     teams_tenant_id: Optional[str] = None
+    jira_cloud_id: Optional[str] = None  # cloud ID is not secret; token excluded
 
     class Config:
         from_attributes = True
@@ -42,6 +45,11 @@ class SlackBotTokenUpdate(BaseModel):
 
 class TrelloConnectRequest(BaseModel):
     trello_token: str
+
+
+class JiraConnectRequest(BaseModel):
+    jira_token: str
+    jira_cloud_id: str
 
 
 class TeamResponse(BaseModel):

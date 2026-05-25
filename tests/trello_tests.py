@@ -39,7 +39,7 @@ mock_team_no_trello = {
     "manager": MagicMock(id=1, email="manager@example.com"),
 }
 
-_updated_team = MagicMock(id=1, manager_id=1, slack_bot_token=None, teams_tenant_id=None, trello_token="trello-tok")
+_updated_team = MagicMock(id=1, manager_id=1, slack_bot_token=None, teams_tenant_id=None, trello_token="trello-tok", jira_cloud_id=None)
 _updated_team.name = "Test Team"
 
 
@@ -250,7 +250,7 @@ def test_webhook_deduplicates_same_action_id():
             "data": {
                 "card": {"name": "Sprint fim"},
                 "listBefore": {"id": "list1"},
-                "listAfter": {"id": "list2"},
+                "listAfter": {"id": "list2", "name": "Pronto"},
             },
         }
     }
