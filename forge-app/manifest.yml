@@ -1,0 +1,52 @@
+modules:
+  jira:boardPage:
+    - key: agilemood-dashboard
+      title: Dashboard AgileMood
+      function: dashboard-fn
+      render: native
+
+  jira:issuePanel:
+    - key: agilemood-register-feeling
+      title: Registar Sentimento
+      function: register-feeling-fn
+      render: native
+    - key: agilemood-messages
+      title: Mensagens Recebidas
+      function: messages-fn
+      render: native
+
+  jira:globalSettings:
+    - key: agilemood-settings
+      title: AgileMood Settings
+      function: settings-fn
+      render: native
+
+  trigger:
+    - key: agilemood-sprint-end
+      function: sprint-end-fn
+      events:
+        - avi:jira:updated:sprint
+
+  function:
+    - key: dashboard-fn
+      handler: src/index.runDashboard
+    - key: register-feeling-fn
+      handler: src/index.runRegisterFeeling
+    - key: messages-fn
+      handler: src/index.runMessages
+    - key: settings-fn
+      handler: src/index.runSettings
+    - key: sprint-end-fn
+      handler: src/trigger.handler
+
+permissions:
+  scopes:
+    - read:jira-user
+    - read:jira-work
+  external:
+    fetch:
+      backend:
+        - '*'
+
+app:
+  id: ari:cloud:ecosystem::app/agilemood

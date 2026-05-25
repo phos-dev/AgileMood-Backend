@@ -1,0 +1,13 @@
+{
+  "name": "agilemood-jira-forge",
+  "version": "1.0.0",
+  "description": "AgileMood Jira Forge App",
+  "license": "MIT",
+  "dependencies": {
+    "@forge/api": "^4.0.0",
+    "@forge/ui": "^1.0.0"
+  },
+  "devDependencies": {
+    "@forge/cli": "latest"
+  }
+}
