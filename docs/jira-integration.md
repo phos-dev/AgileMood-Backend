@@ -233,7 +233,7 @@ npm install -g @forge/cli
 forge login
 forge register       # creates app in Atlassian developer console → copy app ID to manifest.yml app.id
 forge deploy -e development
-forge install --site your-site.atlassian.net -e development
+forge install --site agilemood.atlassian.net -e development
 ```
 
 Set `JIRA_WEBHOOK_SECRET` in backend `.env` and enter the same value in the Forge App Settings panel.

@@ -1,5 +1,5 @@
 modules:
-  jira:boardPage:
+  jira:projectPage:
     - key: agilemood-dashboard
       title: Dashboard AgileMood
       function: dashboard-fn
@@ -10,12 +10,14 @@ modules:
       title: Registar Sentimento
       function: register-feeling-fn
       render: native
+      icon: https://agilemood-backend-v2.vercel.app/powerup/icon.png
     - key: agilemood-messages
       title: Mensagens Recebidas
       function: messages-fn
       render: native
+      icon: https://agilemood-backend-v2.vercel.app/powerup/icon.png
 
-  jira:globalSettings:
+  jira:adminPage:
     - key: agilemood-settings
       title: AgileMood Settings
       function: settings-fn
@@ -29,24 +31,27 @@ modules:
 
   function:
     - key: dashboard-fn
-      handler: src/index.runDashboard
+      handler: index.runDashboard
     - key: register-feeling-fn
-      handler: src/index.runRegisterFeeling
+      handler: index.runRegisterFeeling
     - key: messages-fn
-      handler: src/index.runMessages
+      handler: index.runMessages
     - key: settings-fn
-      handler: src/index.runSettings
+      handler: index.runSettings
     - key: sprint-end-fn
-      handler: src/trigger.handler
+      handler: trigger.handler
 
 permissions:
   scopes:
+    - storage:app
     - read:jira-user
     - read:jira-work
   external:
     fetch:
       backend:
-        - '*'
+        - address: "*"
 
 app:
-  id: ari:cloud:ecosystem::app/agilemood
+  id: ari:cloud:ecosystem::app/47a7abed-39a8-4f7b-8240-e1152b99e308
+  runtime:
+    name: nodejs22.x

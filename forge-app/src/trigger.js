@@ -1,4 +1,4 @@
-import { storage } from '@forge/api';
+import { kvs } from '@forge/kvs';
 import api from '@forge/api';
 
 /**
@@ -11,7 +11,7 @@ export async function handler(event) {
     return;
   }
 
-  const settings = await storage.get('agilemood-settings');
+  const settings = await kvs.get('agilemood-settings');
   if (!settings?.apiUrl || !settings?.jwtToken || !settings?.teamId) {
     console.log('[AgileMood] Forge trigger not configured. Skipping sprint-end reminder.');
     return;
