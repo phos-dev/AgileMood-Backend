@@ -9,6 +9,8 @@ const SectionMessage = RawSectionMessage as any;
 const DynamicTable = RawDynamicTable as any;
 import { kvs } from '@forge/kvs';
 
+const API_URL = 'https://agilemood-backend-v2.vercel.app';
+
 export default function RF07Messages() {
   const [settings, setSettings] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -18,9 +20,9 @@ export default function RF07Messages() {
   useEffect(() => {
     kvs.get('agilemood-settings').then((s: any) => {
       setSettings(s);
-      if (!s?.apiUrl) { setLoading(false); return; }
+      if (!s?.jwtToken) { setLoading(false); return; }
       fetch(
-        `${s.apiUrl}/feedback/?team_id=${s.teamId}`,
+        `${API_URL}/feedback/?team_id=${s.teamId}`,
         { headers: { Authorization: `Bearer ${s.jwtToken}` } },
       )
         .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
@@ -30,7 +32,7 @@ export default function RF07Messages() {
     });
   }, []);
 
-  if (!settings?.apiUrl) {
+  if (!settings?.jwtToken) {
     return (
       <SectionMessage title="AgileMood não configurado" appearance="warning">
         <Text>Peça ao gestor para configurar o app.</Text>

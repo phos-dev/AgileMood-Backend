@@ -11,97 +11,97 @@ const SectionMessage = RawSectionMessage as any;
 const Textfield = RawTextfield as any;
 import { kvs } from '@forge/kvs';
 
+const API_URL = 'https://agilemood-backend-v2.vercel.app';
+
 export default function Settings() {
   const [settings, setSettings] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [apiUrl, setApiUrl] = useState('');
-  const [jwtToken, setJwtToken] = useState('');
   const [teamId, setTeamId] = useState('');
-  const [webhookSecret, setWebhookSecret] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     kvs.get('agilemood-settings').then((s: any) => {
-      if (s) {
-        setSettings(s);
-        setApiUrl(s.apiUrl || '');
-        setJwtToken(s.jwtToken || '');
-        setTeamId(s.teamId ? String(s.teamId) : '');
-        setWebhookSecret(s.webhookSecret || '');
-      }
+      if (s?.jwtToken) setSettings(s);
     });
   }, []);
 
-  const handleSubmit = async () => {
-    if (!apiUrl || !jwtToken || !teamId) {
-      setError('Os campos URL da API, Token JWT e ID da Equipe são obrigatórios.');
+  const handleLogin = async () => {
+    if (!teamId || !email || !password) {
+      setError('ID da Equipe, e-mail e senha são obrigatórios.');
       return;
     }
-    if (!apiUrl.startsWith('https://') && !apiUrl.startsWith('http://localhost')) {
-      setError('A URL da API deve usar HTTPS (ex: https://seu-backend.com).');
-      return;
-    }
+    setLoading(true);
+    setError(null);
     try {
-      const resp = await fetch(`${apiUrl}/teams/`, {
-        headers: { Authorization: `Bearer ${jwtToken}` },
+      const resp = await fetch(`${API_URL}/user/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: email, password }).toString(),
       });
       if (!resp.ok) throw new Error(`${resp.status}`);
+      const data = await resp.json();
+      const newSettings = { teamId: parseInt(teamId, 10), jwtToken: data.access_token, email };
+      await kvs.set('agilemood-settings', newSettings);
+      setSettings(newSettings);
+      setPassword('');
     } catch (e: any) {
-      setError(`Falha ao validar token: ${e.message}. Verifique a URL e o JWT.`);
-      return;
+      setError(`Falha no login: ${e.message}. Verifique suas credenciais.`);
+    } finally {
+      setLoading(false);
     }
-    const newSettings = {
-      apiUrl: apiUrl.replace(/\/$/, ''),
-      jwtToken,
-      teamId: parseInt(teamId, 10),
-      webhookSecret: webhookSecret || '',
-    };
-    await kvs.set('agilemood-settings', newSettings);
-    setSettings(newSettings);
-    setSaved(true);
-    setError(null);
   };
 
-  return (
-    <>
-      <Text>**Configurações AgileMood**</Text>
-      {saved && (
-        <SectionMessage title="Configurações salvas com sucesso!" appearance="confirmation">
-          <Text> </Text>
+  const handleDisconnect = async () => {
+    await kvs.set('agilemood-settings', null);
+    setSettings(null);
+    setTeamId('');
+    setEmail('');
+    setPassword('');
+  };
+
+  if (settings?.jwtToken) {
+    return (
+      <ForgeUI.Fragment>
+        <Text>**Configurações AgileMood**</Text>
+        <SectionMessage title="App conectado!" appearance="confirmation">
+          <Text>Equipe: {String(settings.teamId)} — {settings.email || 'conectado'}</Text>
         </SectionMessage>
-      )}
+        <Button type="button" onClick={handleDisconnect}>Desconectar</Button>
+      </ForgeUI.Fragment>
+    );
+  }
+
+  return (
+    <ForgeUI.Fragment>
+      <Text>**Configurações AgileMood**</Text>
       {error && (
         <SectionMessage title={error} appearance="error">
           <Text> </Text>
         </SectionMessage>
       )}
-      <Form onSubmit={handleSubmit}>
-        <Textfield
-          name="apiUrl"
-          placeholder="https://seu-backend.com"
-          value={apiUrl}
-          onChange={(e: any) => setApiUrl(e.target?.value ?? e)}
-        />
-        <Textfield
-          name="jwtToken"
-          placeholder="eyJ..."
-          value={jwtToken}
-          onChange={(e: any) => setJwtToken(e.target?.value ?? e)}
-        />
+      <Form onSubmit={handleLogin}>
         <Textfield
           name="teamId"
-          placeholder="1"
+          placeholder="ID da Equipe (ex: 1)"
           value={teamId}
           onChange={(e: any) => setTeamId(e.target?.value ?? e)}
         />
         <Textfield
-          name="webhookSecret"
-          placeholder="segredo-compartilhado"
-          value={webhookSecret}
-          onChange={(e: any) => setWebhookSecret(e.target?.value ?? e)}
+          name="email"
+          placeholder="E-mail do gestor"
+          value={email}
+          onChange={(e: any) => setEmail(e.target?.value ?? e)}
         />
-        <Button type="submit">Salvar</Button>
+        <Textfield
+          name="password"
+          placeholder="Senha"
+          value={password}
+          onChange={(e: any) => setPassword(e.target?.value ?? e)}
+        />
+        <Button type="submit">{loading ? 'Conectando...' : 'Conectar'}</Button>
       </Form>
-    </>
+    </ForgeUI.Fragment>
   );
 }

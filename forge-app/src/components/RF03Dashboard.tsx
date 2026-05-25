@@ -13,6 +13,8 @@ const DynamicTable = RawDynamicTable as any;
 const DatePicker = RawDatePicker as any;
 import { kvs } from '@forge/kvs';
 
+const API_URL = 'https://agilemood-backend-v2.vercel.app';
+
 export default function RF03Dashboard() {
   const [settings, setSettings] = useState<any>(null);
   const [report, setReport] = useState<any>(null);
@@ -25,7 +27,7 @@ export default function RF03Dashboard() {
     kvs.get('agilemood-settings').then((s: any) => setSettings(s));
   }, []);
 
-  if (!settings?.apiUrl) {
+  if (!settings?.jwtToken) {
     return (
       <SectionMessage title="AgileMood não configurado" appearance="warning">
         <Text>Configure o app em Configurações → Apps → AgileMood.</Text>
@@ -41,7 +43,7 @@ export default function RF03Dashboard() {
       if (startDate) params.set('start_date', startDate);
       if (endDate) params.set('end_date', endDate);
       const resp = await fetch(
-        `${settings.apiUrl}/reports/mood-summary?${params}`,
+        `${API_URL}/reports/mood-summary?${params}`,
         { headers: { Authorization: `Bearer ${settings.jwtToken}` } },
       );
       if (!resp.ok) throw new Error(`${resp.status}`);

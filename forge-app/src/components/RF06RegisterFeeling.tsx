@@ -15,6 +15,8 @@ const Range = RawRange as any;
 const Textfield = RawTextfield as any;
 import { kvs } from '@forge/kvs';
 
+const API_URL = 'https://agilemood-backend-v2.vercel.app';
+
 const EMOTIONS = [
   { label: 'Alegria', value: '1' },
   { label: 'Tristeza', value: '2' },
@@ -36,7 +38,7 @@ export default function RF06RegisterFeeling() {
     kvs.get('agilemood-settings').then((s: any) => setSettings(s));
   }, []);
 
-  if (!settings?.apiUrl) {
+  if (!settings?.jwtToken) {
     return (
       <SectionMessage title="AgileMood não configurado" appearance="warning">
         <Text>Peça ao gestor para configurar o app em Configurações → Apps → AgileMood.</Text>
@@ -55,7 +57,7 @@ export default function RF06RegisterFeeling() {
   const handleSubmit = async () => {
     setError(null);
     try {
-      const resp = await fetch(`${settings.apiUrl}/emotion_record/`, {
+      const resp = await fetch(`${API_URL}/emotion_record/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -11,8 +11,9 @@ export async function handler(event) {
     return;
   }
 
+  const API_URL = 'https://agilemood-backend-v2.vercel.app';
   const settings = await kvs.get('agilemood-settings');
-  if (!settings?.apiUrl || !settings?.jwtToken || !settings?.teamId) {
+  if (!settings?.jwtToken || !settings?.teamId) {
     console.log('[AgileMood] Forge trigger not configured. Skipping sprint-end reminder.');
     return;
   }
@@ -24,12 +25,13 @@ export async function handler(event) {
 
   const headers = { 'Content-Type': 'application/json' };
 
-  if (settings.webhookSecret) {
-    const sig = await _hmacSha256(settings.webhookSecret, body);
+  const secret = process.env.JIRA_WEBHOOK_SECRET || '';
+  if (secret) {
+    const sig = await _hmacSha256(secret, body);
     headers['X-Jira-Signature'] = sig;
   }
 
-  const url = `${settings.apiUrl}/webhooks/jira/sprint-end?team_id=${settings.teamId}`;
+  const url = `${API_URL}/webhooks/jira/sprint-end?team_id=${settings.teamId}`;
 
   try {
     const resp = await api.fetch(url, { method: 'POST', headers, body });
