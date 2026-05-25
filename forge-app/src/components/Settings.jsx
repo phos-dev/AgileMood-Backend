@@ -19,6 +19,10 @@ export default function Settings() {
       setError('Os campos URL da API, Token JWT e ID da Equipe são obrigatórios.');
       return;
     }
+    if (!apiUrl.startsWith('https://') && !apiUrl.startsWith('http://localhost')) {
+      setError('A URL da API deve usar HTTPS (ex: https://seu-backend.com).');
+      return;
+    }
     try {
       const resp = await fetch(`${apiUrl}/teams/`, {
         headers: { Authorization: `Bearer ${jwtToken}` },

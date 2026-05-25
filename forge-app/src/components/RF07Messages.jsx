@@ -17,7 +17,8 @@ export default function RF07Messages() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(async () => {
+  useEffect(() => {
+    (async () => {
     if (!settings?.apiUrl) {
       setLoading(false);
       return;
@@ -35,6 +36,7 @@ export default function RF07Messages() {
     } finally {
       setLoading(false);
     }
+    })();
   }, []);
 
   if (!settings?.apiUrl) {
