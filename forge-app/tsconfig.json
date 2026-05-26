@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
-    "jsxFragmentFactory": "ForgeUI.Fragment"
+    "jsx": "react",
+    "esModuleInterop": true
   }
 }

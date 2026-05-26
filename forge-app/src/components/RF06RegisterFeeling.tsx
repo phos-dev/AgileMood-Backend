@@ -1,7 +1,7 @@
-import * as ForgeUI from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Text,
+  Strong as RawStrong,
   SectionMessage as RawSectionMessage,
   Form,
   Select as RawSelect,
@@ -9,13 +9,12 @@ import {
   Textfield as RawTextfield,
   Button,
 } from '@forge/react';
+const Strong = RawStrong as any;
 const SectionMessage = RawSectionMessage as any;
 const Select = RawSelect as any;
 const Range = RawRange as any;
 const Textfield = RawTextfield as any;
-import { kvs } from '@forge/kvs';
-
-const API_URL = 'https://agilemood-backend-v2.vercel.app';
+import { invoke } from '@forge/bridge';
 
 const EMOTIONS = [
   { label: 'Alegria', value: '1' },
@@ -28,6 +27,7 @@ const EMOTIONS = [
 
 export default function RF06RegisterFeeling() {
   const [settings, setSettings] = useState<any>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emotionId, setEmotionId] = useState('1');
@@ -35,12 +35,17 @@ export default function RF06RegisterFeeling() {
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
-    kvs.get('agilemood-settings').then((s: any) => setSettings(s));
+    invoke<any>('getSettings').then((s: any) => {
+      setSettings(s);
+      setSettingsLoaded(true);
+    });
   }, []);
+
+  if (!settingsLoaded) return <Text>Carregando...</Text>;
 
   if (!settings?.jwtToken) {
     return (
-      <SectionMessage title="AgileMood não configurado" appearance="warning">
+      <SectionMessage title="AgileMood não configurado" appearance="warning" actions={[]} testId="sm-cfg">
         <Text>Peça ao gestor para configurar o app em Configurações → Apps → AgileMood.</Text>
       </SectionMessage>
     );
@@ -48,7 +53,7 @@ export default function RF06RegisterFeeling() {
 
   if (submitted) {
     return (
-      <SectionMessage title="Sentimento registrado com sucesso!" appearance="confirmation">
+      <SectionMessage title="Sentimento registrado com sucesso!" appearance="confirmation" actions={[]} testId="sm-ok">
         <Text>Seu registro é 100% anônimo.</Text>
       </SectionMessage>
     );
@@ -57,21 +62,13 @@ export default function RF06RegisterFeeling() {
   const handleSubmit = async () => {
     setError(null);
     try {
-      const resp = await fetch(`${API_URL}/emotion_record/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${settings.jwtToken}`,
-        },
-        body: JSON.stringify({
-          emotion_id: parseInt(emotionId, 10),
-          intensity,
-          notes,
-          team_id: settings.teamId,
-          is_anonymous: true,
-        }),
+      await invoke('registerEmotion', {
+        emotionId,
+        intensity,
+        notes,
+        teamId: settings.teamId,
+        jwtToken: settings.jwtToken,
       });
-      if (!resp.ok) throw new Error(`${resp.status}`);
       setSubmitted(true);
     } catch (e: any) {
       setError(`Erro ao registrar: ${e.message}`);
@@ -80,9 +77,9 @@ export default function RF06RegisterFeeling() {
 
   return (
     <>
-      <Text>**Registrar Sentimento** — anônimo e confidencial</Text>
+      <Text><Strong>Registrar Sentimento</Strong> — anônimo e confidencial</Text>
       {error && (
-        <SectionMessage title={error} appearance="error">
+        <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
           <Text> </Text>
         </SectionMessage>
       )}

@@ -1,17 +1,16 @@
-import * as ForgeUI from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Text,
+  Strong as RawStrong,
   SectionMessage as RawSectionMessage,
   Form,
   Textfield as RawTextfield,
   Button,
 } from '@forge/react';
+const Strong = RawStrong as any;
 const SectionMessage = RawSectionMessage as any;
 const Textfield = RawTextfield as any;
-import { kvs } from '@forge/kvs';
-
-const API_URL = 'https://agilemood-backend-v2.vercel.app';
+import { invoke } from '@forge/bridge';
 
 export default function Settings() {
   const [settings, setSettings] = useState<any>(null);
@@ -22,7 +21,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    kvs.get('agilemood-settings').then((s: any) => {
+    invoke<any>('getSettings').then((s: any) => {
       if (s?.jwtToken) setSettings(s);
     });
   }, []);
@@ -35,15 +34,9 @@ export default function Settings() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch(`${API_URL}/user/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ username: email, password }).toString(),
-      });
-      if (!resp.ok) throw new Error(`${resp.status}`);
-      const data = await resp.json();
+      const data = await invoke<any>('login', { email, password });
       const newSettings = { teamId: parseInt(teamId, 10), jwtToken: data.access_token, email };
-      await kvs.set('agilemood-settings', newSettings);
+      await invoke('saveSettings', newSettings);
       setSettings(newSettings);
       setPassword('');
     } catch (e: any) {
@@ -54,7 +47,7 @@ export default function Settings() {
   };
 
   const handleDisconnect = async () => {
-    await kvs.set('agilemood-settings', null);
+    await invoke('saveSettings', null);
     setSettings(null);
     setTeamId('');
     setEmail('');
@@ -63,21 +56,21 @@ export default function Settings() {
 
   if (settings?.jwtToken) {
     return (
-      <ForgeUI.Fragment>
-        <Text>**Configurações AgileMood**</Text>
-        <SectionMessage title="App conectado!" appearance="confirmation">
+      <>
+        <Text><Strong>Configurações AgileMood</Strong></Text>
+        <SectionMessage title="App conectado!" appearance="confirmation" actions={[]} testId="sm-ok">
           <Text>Equipe: {String(settings.teamId)} — {settings.email || 'conectado'}</Text>
         </SectionMessage>
         <Button type="button" onClick={handleDisconnect}>Desconectar</Button>
-      </ForgeUI.Fragment>
+      </>
     );
   }
 
   return (
-    <ForgeUI.Fragment>
+    <>
       <Text>**Configurações AgileMood**</Text>
       {error && (
-        <SectionMessage title={error} appearance="error">
+        <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
           <Text> </Text>
         </SectionMessage>
       )}
@@ -102,6 +95,6 @@ export default function Settings() {
         />
         <Button type="submit">{loading ? 'Conectando...' : 'Conectar'}</Button>
       </Form>
-    </ForgeUI.Fragment>
+    </>
   );
 }

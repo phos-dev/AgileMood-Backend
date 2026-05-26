@@ -1,27 +1,19 @@
 modules:
   jira:projectPage:
     - key: agilemood-dashboard
-      title: Dashboard AgileMood
-      function: dashboard-fn
+      title: AgileMood
+      resource: dashboard-res
       render: native
-
-  jira:issuePanel:
-    - key: agilemood-register-feeling
-      title: Registar Sentimento
-      function: register-feeling-fn
-      render: native
-      icon: https://agilemood-backend-v2.vercel.app/powerup/icon.png
-    - key: agilemood-messages
-      title: Mensagens Recebidas
-      function: messages-fn
-      render: native
-      icon: https://agilemood-backend-v2.vercel.app/powerup/icon.png
+      resolver:
+        function: resolver-fn
 
   jira:adminPage:
     - key: agilemood-settings
       title: AgileMood Settings
-      function: settings-fn
+      resource: settings-res
       render: native
+      resolver:
+        function: resolver-fn
 
   trigger:
     - key: agilemood-sprint-end
@@ -30,16 +22,16 @@ modules:
         - avi:jira:updated:sprint
 
   function:
-    - key: dashboard-fn
-      handler: index.runDashboard
-    - key: register-feeling-fn
-      handler: index.runRegisterFeeling
-    - key: messages-fn
-      handler: index.runMessages
-    - key: settings-fn
-      handler: index.runSettings
+    - key: resolver-fn
+      handler: resolver.handler
     - key: sprint-end-fn
       handler: trigger.handler
+
+resources:
+  - key: dashboard-res
+    path: src/dashboard.tsx
+  - key: settings-res
+    path: src/settings.tsx
 
 permissions:
   scopes:

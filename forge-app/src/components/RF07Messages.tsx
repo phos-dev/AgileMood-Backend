@@ -1,15 +1,14 @@
-import * as ForgeUI from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Text,
+  Strong as RawStrong,
   SectionMessage as RawSectionMessage,
   DynamicTable as RawDynamicTable,
 } from '@forge/react';
+const Strong = RawStrong as any;
 const SectionMessage = RawSectionMessage as any;
 const DynamicTable = RawDynamicTable as any;
-import { kvs } from '@forge/kvs';
-
-const API_URL = 'https://agilemood-backend-v2.vercel.app';
+import { invoke } from '@forge/bridge';
 
 export default function RF07Messages() {
   const [settings, setSettings] = useState<any>(null);
@@ -18,30 +17,34 @@ export default function RF07Messages() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    kvs.get('agilemood-settings').then((s: any) => {
+    invoke<any>('getSettings').then((s: any) => {
       setSettings(s);
       if (!s?.jwtToken) { setLoading(false); return; }
-      fetch(
-        `${API_URL}/feedback/?team_id=${s.teamId}`,
-        { headers: { Authorization: `Bearer ${s.jwtToken}` } },
-      )
-        .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
-        .then((data) => setMessages(Array.isArray(data) ? data : data.feedbacks || []))
+      invoke<any>('getMessages', { teamId: s.teamId, jwtToken: s.jwtToken })
+        .then((data: any[]) => setMessages(data))
         .catch((e: any) => setError(`Erro ao carregar mensagens: ${e.message}`))
         .finally(() => setLoading(false));
     });
   }, []);
 
+  if (loading) return <Text>Carregando mensagens...</Text>;
+
   if (!settings?.jwtToken) {
     return (
-      <SectionMessage title="AgileMood não configurado" appearance="warning">
+      <SectionMessage title="AgileMood não configurado" appearance="warning" actions={[]} testId="sm-cfg">
         <Text>Peça ao gestor para configurar o app.</Text>
       </SectionMessage>
     );
   }
 
-  if (loading) return <Text>Carregando mensagens...</Text>;
-  if (error) return <SectionMessage title={error} appearance="error"><Text> </Text></SectionMessage>;
+  if (error) {
+    return (
+      <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
+        <Text> </Text>
+      </SectionMessage>
+    );
+  }
+
   if (messages.length === 0) return <Text>Nenhuma mensagem recebida ainda.</Text>;
 
   const head = { cells: [{ key: 'date', content: 'Data' }, { key: 'msg', content: 'Mensagem' }] };
@@ -55,7 +58,7 @@ export default function RF07Messages() {
 
   return (
     <>
-      <Text>**Mensagens Recebidas** — somente leitura</Text>
+      <Text><Strong>Mensagens Recebidas</Strong> — somente leitura</Text>
       <DynamicTable head={head} rows={rows} />
     </>
   );

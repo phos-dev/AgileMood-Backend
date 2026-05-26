@@ -1,22 +1,22 @@
-import * as ForgeUI from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Text,
+  Strong as RawStrong,
   SectionMessage as RawSectionMessage,
   DynamicTable as RawDynamicTable,
   Form,
   DatePicker as RawDatePicker,
   Button,
 } from '@forge/react';
+const Strong = RawStrong as any;
 const SectionMessage = RawSectionMessage as any;
 const DynamicTable = RawDynamicTable as any;
 const DatePicker = RawDatePicker as any;
-import { kvs } from '@forge/kvs';
-
-const API_URL = 'https://agilemood-backend-v2.vercel.app';
+import { invoke } from '@forge/bridge';
 
 export default function RF03Dashboard() {
   const [settings, setSettings] = useState<any>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [report, setReport] = useState<any>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -24,12 +24,17 @@ export default function RF03Dashboard() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    kvs.get('agilemood-settings').then((s: any) => setSettings(s));
+    invoke<any>('getSettings').then((s: any) => {
+      setSettings(s);
+      setSettingsLoaded(true);
+    });
   }, []);
+
+  if (!settingsLoaded) return <Text>Carregando...</Text>;
 
   if (!settings?.jwtToken) {
     return (
-      <SectionMessage title="AgileMood não configurado" appearance="warning">
+      <SectionMessage title="AgileMood não configurado" appearance="warning" actions={[]} testId="sm-cfg">
         <Text>Configure o app em Configurações → Apps → AgileMood.</Text>
       </SectionMessage>
     );
@@ -39,15 +44,13 @@ export default function RF03Dashboard() {
     setError(null);
     setLoading(true);
     try {
-      const params = new URLSearchParams({ team_id: settings.teamId });
-      if (startDate) params.set('start_date', startDate);
-      if (endDate) params.set('end_date', endDate);
-      const resp = await fetch(
-        `${API_URL}/reports/mood-summary?${params}`,
-        { headers: { Authorization: `Bearer ${settings.jwtToken}` } },
-      );
-      if (!resp.ok) throw new Error(`${resp.status}`);
-      setReport(await resp.json());
+      const data = await invoke<any>('getMoodSummary', {
+        teamId: settings.teamId,
+        jwtToken: settings.jwtToken,
+        startDate,
+        endDate,
+      });
+      setReport(data);
     } catch (e: any) {
       setError(`Erro ao carregar dashboard: ${e.message}`);
     } finally {
@@ -55,30 +58,37 @@ export default function RF03Dashboard() {
     }
   };
 
-  const head = { cells: [{ key: 'emotion', content: 'Emoção' }, { key: 'count', content: 'Contagem' }] };
-  const rows = (report?.emotions ?? []).map((e: any, i: number) => ({
+  const distHead = { cells: [{ key: 'emotion', content: 'Emoção' }, { key: 'freq', content: 'Frequência' }] };
+  const distRows = (report?.dist?.emoji_distribution ?? []).map((e: any, i: number) => ({
     key: String(i),
-    cells: [{ content: e.name || e.emotion }, { content: String(e.count) }],
+    cells: [{ content: e.emotion_name }, { content: String(e.frequency) }],
+  }));
+
+  const intHead = { cells: [{ key: 'emotion', content: 'Emoção' }, { key: 'avg', content: 'Intensidade Média' }] };
+  const intRows = (report?.intensity?.average_intensity ?? []).map((e: any, i: number) => ({
+    key: String(i),
+    cells: [{ content: e.emotion_name }, { content: e.avg_intensity?.toFixed(2) }],
   }));
 
   return (
     <>
-      <Text>**Dashboard AgileMood — Humor da Equipe**</Text>
+      <Text><Strong>Dashboard AgileMood — Humor da Equipe</Strong></Text>
       <Form onSubmit={handleSubmit}>
         <DatePicker name="startDate" onChange={(v: string) => setStartDate(v)} />
         <DatePicker name="endDate" onChange={(v: string) => setEndDate(v)} />
         <Button type="submit">{loading ? 'Carregando...' : 'Carregar'}</Button>
       </Form>
       {error && (
-        <SectionMessage title={error} appearance="error">
+        <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
           <Text> </Text>
         </SectionMessage>
       )}
       {report && (
         <>
-          <Text>**Nível de Alerta:** {report.alert_level ?? '—'}</Text>
-          <Text>**Intensidade Média:** {report.avg_intensity?.toFixed(2) ?? '—'}</Text>
-          {rows.length > 0 && <DynamicTable head={head} rows={rows} />}
+          <Text><Strong>Alerta:</Strong> {report.dist.alert ?? '—'}</Text>
+          <Text><Strong>Ratio Negativo:</Strong> {(report.dist.negative_emotion_ratio ?? 0).toFixed(1)}%</Text>
+          {distRows.length > 0 && <DynamicTable head={distHead} rows={distRows} />}
+          {intRows.length > 0 && <DynamicTable head={intHead} rows={intRows} />}
         </>
       )}
     </>
