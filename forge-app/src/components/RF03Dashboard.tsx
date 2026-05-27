@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   Text,
   Strong as RawStrong,
+  Stack as RawStack,
   SectionMessage as RawSectionMessage,
   DynamicTable as RawDynamicTable,
-  Form,
   DatePicker as RawDatePicker,
   Button,
 } from '@forge/react';
 const Strong = RawStrong as any;
+const Stack = RawStack as any;
 const SectionMessage = RawSectionMessage as any;
 const DynamicTable = RawDynamicTable as any;
 const DatePicker = RawDatePicker as any;
@@ -36,6 +37,14 @@ export default function RF03Dashboard() {
     return (
       <SectionMessage title="AgileMood não configurado" appearance="warning" actions={[]} testId="sm-cfg">
         <Text>Configure o app em Configurações → Apps → AgileMood.</Text>
+      </SectionMessage>
+    );
+  }
+
+  if (!settings?.teamId) {
+    return (
+      <SectionMessage title="Equipe não configurada" appearance="warning" actions={[]} testId="sm-noteam">
+        <Text>Sua conta não está associada a uma equipe. Verifique no AgileMood.</Text>
       </SectionMessage>
     );
   }
@@ -71,13 +80,11 @@ export default function RF03Dashboard() {
   }));
 
   return (
-    <>
+    <Stack space="space.200">
       <Text><Strong>Dashboard AgileMood — Humor da Equipe</Strong></Text>
-      <Form onSubmit={handleSubmit}>
-        <DatePicker name="startDate" onChange={(v: string) => setStartDate(v)} />
-        <DatePicker name="endDate" onChange={(v: string) => setEndDate(v)} />
-        <Button type="submit">{loading ? 'Carregando...' : 'Carregar'}</Button>
-      </Form>
+      <DatePicker name="startDate" onChange={(v: string) => setStartDate(v)} />
+      <DatePicker name="endDate" onChange={(v: string) => setEndDate(v)} />
+      <Button type="button" onClick={handleSubmit}>{loading ? 'Carregando...' : 'Carregar'}</Button>
       {error && (
         <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
           <Text> </Text>
@@ -91,6 +98,6 @@ export default function RF03Dashboard() {
           {intRows.length > 0 && <DynamicTable head={intHead} rows={intRows} />}
         </>
       )}
-    </>
+    </Stack>
   );
 }

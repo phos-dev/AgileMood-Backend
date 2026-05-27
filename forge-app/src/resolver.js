@@ -5,12 +5,12 @@ import api from '@forge/api';
 const API_URL = 'https://agilemood-backend-v2.vercel.app';
 const resolver = new Resolver();
 
-resolver.define('getSettings', async () => {
-  return await kvs.get('agilemood-settings');
+resolver.define('getSettings', async ({ context }) => {
+  return await kvs.get(`settings-${context.accountId}`);
 });
 
-resolver.define('saveSettings', async ({ payload }) => {
-  await kvs.set('agilemood-settings', payload);
+resolver.define('saveSettings', async ({ payload, context }) => {
+  await kvs.set(`settings-${context.accountId}`, payload);
   return { success: true };
 });
 
@@ -22,7 +22,15 @@ resolver.define('login', async ({ payload }) => {
     body: new URLSearchParams({ username: email, password }).toString(),
   });
   if (!resp.ok) throw new Error(`${resp.status}`);
-  return await resp.json();
+  const { access_token } = await resp.json();
+
+  const meResp = await api.fetch(`${API_URL}/user/logged`, {
+    headers: { Authorization: `Bearer ${access_token}` },
+  });
+  if (!meResp.ok) throw new Error(`me: ${meResp.status}`);
+  const me = await meResp.json();
+
+  return { access_token, role: me.role, teamId: me.team_id, name: me.name, email: me.email };
 });
 
 resolver.define('getMoodSummary', async ({ payload }) => {
@@ -44,29 +52,56 @@ resolver.define('getMoodSummary', async ({ payload }) => {
   return { dist, intensity };
 });
 
-resolver.define('registerEmotion', async ({ payload }) => {
-  const { emotionId, intensity, notes, teamId, jwtToken } = payload;
-  const resp = await api.fetch(`${API_URL}/emotion_record/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${jwtToken}`,
-    },
-    body: JSON.stringify({
-      emotion_id: parseInt(emotionId, 10),
-      intensity,
-      notes,
-      team_id: teamId,
-      is_anonymous: true,
-    }),
+resolver.define('getMyTeam', async ({ payload }) => {
+  const { jwtToken } = payload;
+  const resp = await api.fetch(`${API_URL}/teams/`, {
+    headers: { Authorization: `Bearer ${jwtToken}` },
   });
+  if (!resp.ok) throw new Error(`${resp.status}`);
+  const data = await resp.json();
+  const teams = Array.isArray(data) ? data : data.teams ?? [];
+  if (teams.length === 0) return null;
+  return { teamId: teams[0].id, teamName: teams[0].name };
+});
+
+resolver.define('getEmotions', async ({ payload }) => {
+  const { teamId } = payload;
+  const resp = await api.fetch(`${API_URL}/emotions/public?team_id=${teamId}`);
+  if (!resp.ok) throw new Error(`${resp.status}`);
+  const data = await resp.json();
+  return data.emotions ?? [];
+});
+
+resolver.define('registerEmotion', async ({ payload }) => {
+  const { emotionId, intensity, notes, teamId, jwtToken, isAnonymous } = payload;
+  const body = JSON.stringify({
+    emotion_id: parseInt(emotionId, 10),
+    intensity,
+    notes,
+    is_anonymous: isAnonymous,
+  });
+
+  let resp;
+  if (isAnonymous) {
+    resp = await api.fetch(`${API_URL}/emotion_record/public?team_id=${teamId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+  } else {
+    resp = await api.fetch(`${API_URL}/emotion_record/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwtToken}` },
+      body,
+    });
+  }
   if (!resp.ok) throw new Error(`${resp.status}`);
   return { success: true };
 });
 
 resolver.define('getMessages', async ({ payload }) => {
-  const { teamId, jwtToken } = payload;
-  const resp = await api.fetch(`${API_URL}/feedback/?team_id=${teamId}`, {
+  const { jwtToken } = payload;
+  const resp = await api.fetch(`${API_URL}/feedback/`, {
     headers: { Authorization: `Bearer ${jwtToken}` },
   });
   if (!resp.ok) throw new Error(`${resp.status}`);

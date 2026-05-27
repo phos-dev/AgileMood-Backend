@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Text,
   Strong as RawStrong,
+  Stack as RawStack,
   SectionMessage as RawSectionMessage,
   DynamicTable as RawDynamicTable,
 } from '@forge/react';
 const Strong = RawStrong as any;
+const Stack = RawStack as any;
 const SectionMessage = RawSectionMessage as any;
 const DynamicTable = RawDynamicTable as any;
 import { invoke } from '@forge/bridge';
@@ -20,7 +22,7 @@ export default function RF07Messages() {
     invoke<any>('getSettings').then((s: any) => {
       setSettings(s);
       if (!s?.jwtToken) { setLoading(false); return; }
-      invoke<any>('getMessages', { teamId: s.teamId, jwtToken: s.jwtToken })
+      invoke<any>('getMessages', { jwtToken: s.jwtToken })
         .then((data: any[]) => setMessages(data))
         .catch((e: any) => setError(`Erro ao carregar mensagens: ${e.message}`))
         .finally(() => setLoading(false));
@@ -57,9 +59,9 @@ export default function RF07Messages() {
   }));
 
   return (
-    <>
+    <Stack space="space.200">
       <Text><Strong>Mensagens Recebidas</Strong> — somente leitura</Text>
       <DynamicTable head={head} rows={rows} />
-    </>
+    </Stack>
   );
 }
