@@ -3,8 +3,8 @@ from hashlib import sha256
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.schemas.user_schema import User as UserModel
+from app.schemas.team_schema import Team as TeamSchema, user_teams
 from app.models.user_model import UserCreate, UserInDB
-from app.schemas.team_schema import user_teams
 
 from app.utils.logger import logger
 
@@ -18,12 +18,15 @@ def get_user_by_email(db: Session, email: str) -> UserInDB | None:
 
 
 def get_user_team(db: Session, user_id: int):
-    
+    # Try member join table first (employees and managers who are also members)
     team_id = db.execute(
         select(user_teams.c.team_id).where(user_teams.c.user_id == user_id)
     ).scalar()
-
-    return team_id
+    if team_id is not None:
+        return team_id
+    # Fallback: user is a manager who owns a team directly (not in user_teams)
+    team = db.query(TeamSchema).filter(TeamSchema.manager_id == user_id).first()
+    return team.id if team else None
 
 
 def create_user(db: Session, user: UserCreate):
