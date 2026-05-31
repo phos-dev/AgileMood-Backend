@@ -161,8 +161,8 @@ export default function RF06RegisterFeeling() {
       <Checkbox
         name="isAnonymous"
         label="Enviar anonimamente"
-        defaultIsChecked={true}
-        onChange={(e: any) => setIsAnonymous(e.target?.checked ?? !isAnonymous)}
+        isChecked={isAnonymous}
+        onChange={(e: any) => setIsAnonymous(e.target.checked)}
       />
       <Button type="button" onClick={handleSubmit}>Registrar</Button>
     </Stack>
