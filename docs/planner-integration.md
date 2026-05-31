@@ -1,6 +1,6 @@
 # Integração com Microsoft Planner
 
-O AgileMood oferece uma aba interativa no canal do Teams onde o Planner está em uso, permitindo que membros registrem sentimentos anonimamente, gestores visualizem o dashboard de humor do time, e o AgileMood dispare lembretes automáticos (RF01) quando uma tarefa do Planner é concluída.
+O AgileMood oferece uma aba interativa no canal do Teams onde o Planner está em uso, permitindo que membros registrem sentimentos anonimamente, gestores visualizem o dashboard de humor do time, e o AgileMood dispare lembretes automáticos (RF01) ao final de cada sprint, quando a tarefa sentinela de fim de sprint é concluída.
 
 > **Pré-requisito:** A [integração com Microsoft Teams](./teams-integration.md) deve estar configurada antes de ativar o Planner.
 
