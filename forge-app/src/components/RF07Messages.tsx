@@ -24,7 +24,13 @@ export default function RF07Messages() {
       if (!s?.jwtToken) { setLoading(false); return; }
       invoke<any>('getMessages', { jwtToken: s.jwtToken })
         .then((data: any[]) => setMessages(data))
-        .catch((e: any) => setError(`Erro ao carregar mensagens: ${e.message}`))
+        .catch((e: any) => {
+          if (e.message?.includes('401')) {
+            setError('Sessão expirada. Desconecte e reconecte nas Configurações.');
+          } else {
+            setError(`Erro ao carregar mensagens: ${e.message}`);
+          }
+        })
         .finally(() => setLoading(false));
     });
   }, []);

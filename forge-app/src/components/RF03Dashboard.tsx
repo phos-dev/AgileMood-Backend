@@ -61,7 +61,11 @@ export default function RF03Dashboard() {
       });
       setReport(data);
     } catch (e: any) {
-      setError(`Erro ao carregar dashboard: ${e.message}`);
+      if (e.message?.includes('401')) {
+        setError('Sessão expirada. Desconecte e reconecte nas Configurações.');
+      } else {
+        setError(`Erro ao carregar dashboard: ${e.message}`);
+      }
     } finally {
       setLoading(false);
     }

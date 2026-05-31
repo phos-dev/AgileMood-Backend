@@ -101,7 +101,11 @@ export default function RF06RegisterFeeling() {
       });
       setSubmitted(true);
     } catch (e: any) {
-      setError(`Erro ao registrar: ${e.message}`);
+      if (e.message?.includes('401')) {
+        setError('Sessão expirada. Desconecte e reconecte nas Configurações.');
+      } else {
+        setError(`Erro ao registrar: ${e.message}`);
+      }
     }
   };
 
