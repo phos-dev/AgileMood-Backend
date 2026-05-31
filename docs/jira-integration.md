@@ -37,54 +37,20 @@ O App AgileMood para Jira incorpora funcionalidades de monitoramento de humor di
 
 ---
 
-### Passo 2 — Obter o JWT do AgileMood
+### Passo 2 — Configurar o App
 
-O JWT é o token de autenticação do AgileMood, válido por 4 horas.
+1. No Jira, acesse o board do seu projecto
+2. No cabeçalho → clique em **AgileMood** → aba **Configurações**
+3. Introduza o seu **e-mail** e **password** do AgileMood
+4. Clique em **Entrar**
 
-```bash
-curl -X POST https://SEU_BACKEND/user/login \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=SEU_EMAIL&password=SUA_SENHA"
-```
+O app autentica automaticamente e associa a equipa à sua conta. Não é necessário copiar tokens ou IDs manualmente.
 
-Copie o campo `access_token` da resposta.
-
----
-
-### Passo 3 — Obter o ID da sua equipe
-
-```bash
-curl https://SEU_BACKEND/teams/ \
-  -H "Authorization: Bearer SEU_JWT"
-```
-
-Anote o campo `id` da equipe correspondente.
+> **Sessão:** O token expira após 4 horas. Se aparecer erro de "Sessão expirada", clique em **Desconectar** e faça login novamente.
 
 ---
 
-### Passo 4 — Obter o Webhook Secret
-
-Solicite ao time de desenvolvimento o valor de `JIRA_WEBHOOK_SECRET` configurado no servidor. Este segredo é compartilhado entre o backend e o app Jira para verificar autenticidade das requisições.
-
-> Se o campo for deixado em branco nas configurações do app, a verificação de assinatura é desativada (adequado apenas para testes locais).
-
----
-
-### Passo 5 — Configurar o App
-
-1. No Jira, acesse **Configurações → Apps → AgileMood Settings**
-2. Preencha os campos:
-   - **URL da API AgileMood:** `https://SEU_BACKEND` (sem barra no final)
-   - **Token JWT:** cole o token do Passo 2
-   - **ID da Equipe:** cole o ID do Passo 3
-   - **Webhook Secret:** cole o segredo do Passo 4
-3. Clique em **Salvar**
-
-O app valida o token contra a API antes de salvar. Se aparecer erro, verifique se o JWT não expirou.
-
----
-
-### Passo 6 — Usar os painéis
+### Passo 3 — Usar os painéis
 
 **RF06 — Registrar Sentimento**
 1. Abra qualquer issue no Jira
@@ -103,7 +69,7 @@ O app valida o token contra a API antes de salvar. Se aparecer erro, verifique s
 
 ---
 
-### Passo 7 — Gatilho automático de fim de sprint (RF01)
+### Passo 4 — Gatilho automático de fim de sprint (RF01)
 
 Ao **fechar uma sprint** no Jira (botão "Concluir sprint"), o AgileMood detecta automaticamente o evento e envia lembretes Slack (RF01) para todos os membros da equipe solicitando o preenchimento do Questionário Anônimo Periódico.
 
@@ -125,7 +91,6 @@ curl -X DELETE "https://SEU_BACKEND/integrations/jira/disconnect?team_id=SEU_TEA
 | Problema | Causa | Solução |
 |---------|-------|---------|
 | "AgileMood não configurado" | Configurações não salvas | Abrir Settings e preencher todos os campos |
-| Erro "A URL da API deve usar HTTPS" | URL sem HTTPS | Usar `https://` na URL (localhost é permitido para testes) |
 | 403 em connect/disconnect | Usuário não é gestor da equipe | Apenas o gestor que criou a equipe pode configurar |
 | Webhook retorna 404 | Equipe sem jira_token salvo | Executar POST /integrations/jira/connect primeiro |
 | Sem lembretes Slack | Equipe sem Slack bot token | Configurar `PUT /teams/{id}/slack-bot-token` |
@@ -186,9 +151,10 @@ Jira board/issue (Forge iframe)
 RF06 / RF07 / RF03 component
         │  reads settings from Forge storage (apiUrl, jwtToken, teamId)
         │
-        │  RF06: POST /emotion_record/ (is_anonymous=True forced)
-        │  RF07: GET  /feedback/?team_id=X
-        │  RF03: GET  /reports/mood-summary?team_id=X
+        │  RF06: POST /emotion_record/public?team_id=X  (is_anonymous=True forced, no auth)
+        │  RF07: GET  /feedback/  (Bearer JWT)
+        │  RF03: GET  /reports/emoji-distribution/{teamId}
+        │          +  /reports/average-intensity/{teamId}
         ▼
 AgileMood Backend API
 ```
