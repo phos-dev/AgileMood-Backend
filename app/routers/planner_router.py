@@ -17,6 +17,7 @@ from app.services.planner_service import (
     renew_graph_subscription,
 )
 from app.services.report_scheduler import send_sprint_end_reminder_teams
+from app.utils.logger import logger
 
 router = APIRouter(tags=["planner"])
 
@@ -26,12 +27,24 @@ async def planner_notification(
     team_id: int,
     request: Request,
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     validationToken: str | None = None,
 ):
     if validationToken:
+        if len(validationToken) > 512:
+            raise HTTPException(status_code=400, detail="Invalid validation token.")
         return PlainTextResponse(validationToken)
 
-    body = await request.json()
+    team = team_crud.get_team_by_id(db, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found.")
+
+    try:
+        body = await request.json()
+    except ValueError:
+        logger.warning(f"Malformed JSON in planner webhook for team {team_id}")
+        return Response(status_code=202)
+
     triggered = False
     for notification in body.get("value", []):
         if notification.get("clientState") != PLANNER_WEBHOOK_SECRET:
