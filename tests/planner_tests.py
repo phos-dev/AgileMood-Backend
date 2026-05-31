@@ -218,3 +218,34 @@ def test_unsubscribe_clears_subscription_in_db(team_with_tenant, manager_token, 
     # DB cleared
     db.refresh(team_with_tenant)
     assert team_with_tenant.planner_subscription_id is None
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_renewal_job_renews_teams_with_subscription(team_with_tenant, db):
+    """Scheduler renewal job calls renew_graph_subscription for teams with active subscription."""
+    team_with_tenant.planner_subscription_id = "sub-to-renew"
+    db.commit()
+
+    with patch("app.services.report_scheduler.renew_graph_subscription", new_callable=AsyncMock, return_value=True) as mock_renew:
+        from app.services.report_scheduler import renew_all_planner_subscriptions
+        await renew_all_planner_subscriptions()
+
+    # Verify the call used the correct tenant + subscription from real DB
+    mock_renew.assert_any_call("test-tenant-abc", "sub-to-renew")
+
+
+@pytest.mark.asyncio
+async def test_renewal_job_skips_teams_without_subscription(team, db):
+    """Scheduler renewal job does not call Graph API for teams with no subscription."""
+    assert team.planner_subscription_id is None
+
+    with patch("app.services.report_scheduler.renew_graph_subscription", new_callable=AsyncMock) as mock_renew:
+        from app.services.report_scheduler import renew_all_planner_subscriptions
+        await renew_all_planner_subscriptions()
+
+    # None of the calls should reference this team's (non-existent) subscription
+    for call in mock_renew.call_args_list:
+        assert call[0][1] is not None

@@ -25,6 +25,7 @@ from app.services.teams_service import (
     send_dm as teams_send_dm,
 )
 from app.schemas.team_schema import Team
+from app.services.planner_service import renew_graph_subscription
 from app.utils.logger import logger
 
 
@@ -280,6 +281,21 @@ async def send_sprint_end_reminder_teams(team_id: int) -> None:
         db.close()
 
 
+async def renew_all_planner_subscriptions() -> None:
+    db = SessionLocal()
+    try:
+        teams = team_crud.get_all_teams(db)
+        for team in teams:
+            if team.planner_subscription_id and team.teams_tenant_id:
+                success = await renew_graph_subscription(team.teams_tenant_id, team.planner_subscription_id)
+                if not success:
+                    logger.warning(f"Could not renew Planner subscription for team {team.id}")
+    except Exception as e:
+        logger.error(f"Planner subscription renewal error: {e}")
+    finally:
+        db.close()
+
+
 def create_scheduler() -> AsyncIOScheduler:
     """
     Creates and configures the APScheduler instance with four jobs:
@@ -323,6 +339,14 @@ def create_scheduler() -> AsyncIOScheduler:
         id="weekly_teams_reminder",
         name="Weekly Teams Mood Reminder",
         replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    scheduler.add_job(
+        renew_all_planner_subscriptions,
+        "interval",
+        hours=48,
+        id="renew_planner_subscriptions",
         misfire_grace_time=3600,
     )
 
