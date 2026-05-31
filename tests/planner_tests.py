@@ -220,6 +220,31 @@ def test_unsubscribe_clears_subscription_in_db(team_with_tenant, manager_token, 
     assert team_with_tenant.planner_subscription_id is None
 
 
+def test_get_task_returns_title_and_percent():
+    from app.services.planner_service import get_task
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {"id": "task-1", "title": "Sprint 3 - Fim", "percentComplete": 100}
+
+    with patch("app.services.planner_service.get_graph_token", return_value="tok"), \
+         patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_resp):
+        result = asyncio.get_event_loop().run_until_complete(
+            get_task("tenant-1", "task-1")
+        )
+    assert result["title"] == "Sprint 3 - Fim"
+    assert result["percentComplete"] == 100
+
+
+def test_get_task_returns_none_on_error():
+    from app.services.planner_service import get_task
+
+    with patch("app.services.planner_service.get_graph_token", side_effect=Exception("fail")):
+        result = asyncio.get_event_loop().run_until_complete(
+            get_task("tenant-1", "task-1")
+        )
+    assert result is None
+
+
 import pytest
 
 

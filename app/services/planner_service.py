@@ -55,6 +55,22 @@ async def renew_graph_subscription(tenant_id: str, subscription_id: str) -> bool
         return False
 
 
+async def get_task(tenant_id: str, task_id: str) -> dict | None:
+    try:
+        token = await get_graph_token(tenant_id)
+        async with httpx.AsyncClient() as http:
+            response = await http.get(
+                f"https://graph.microsoft.com/v1.0/planner/tasks/{task_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"Failed to fetch planner task {task_id}: {e}")
+        return None
+
+
 async def delete_graph_subscription(tenant_id: str, subscription_id: str) -> bool:
     try:
         token = await get_graph_token(tenant_id)
