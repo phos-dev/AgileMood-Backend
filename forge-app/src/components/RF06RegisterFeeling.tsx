@@ -116,11 +116,7 @@ export default function RF06RegisterFeeling() {
 
   return (
     <Stack space="space.200">
-      {isAnonymous ? (
-        <SectionMessage title="Envio anônimo" appearance="information" actions={[]} testId="sm-anon">
-          <Text>Seu registro não conterá nenhum dado pessoal.</Text>
-        </SectionMessage>
-      ) : (
+      {!isAnonymous && (
         <SectionMessage title="Envio identificado" appearance="warning" actions={[]} testId="sm-ident">
           <Text>O gestor poderá ver sua identidade.</Text>
         </SectionMessage>
@@ -140,7 +136,7 @@ export default function RF06RegisterFeeling() {
         <Select
           name="emotionId"
           options={emotionOptions}
-          defaultValue={emotionOptions[0]}
+          value={emotionOptions.find((o) => o.value === emotionId) ?? emotionOptions[0]}
           onChange={(opt: any) => setEmotionId(opt?.value ?? '')}
         />
       )}

@@ -96,11 +96,6 @@ export default function Settings({ onLogin }: SettingsProps) {
 
   return (
     <Stack space="space.200">
-      {error && (
-        <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
-          <Text> </Text>
-        </SectionMessage>
-      )}
       <Textfield
         name="email"
         placeholder="E-mail"
@@ -114,6 +109,11 @@ export default function Settings({ onLogin }: SettingsProps) {
         value={password}
         onChange={(e: any) => setPassword(e.target?.value ?? e)}
       />
+      {error && (
+        <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
+          <Text> </Text>
+        </SectionMessage>
+      )}
       <Button type="button" onClick={handleLogin}>{loading ? 'Conectando...' : 'Entrar'}</Button>
     </Stack>
   );
