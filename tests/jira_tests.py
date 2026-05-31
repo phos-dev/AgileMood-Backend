@@ -166,7 +166,8 @@ _SPRINT_CLOSED = {
 
 def test_webhook_triggers_on_sprint_closed():
     body = json.dumps(_SPRINT_CLOSED).encode()
-    with patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team), \
+    with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
+         patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team), \
          patch("app.routers.jira_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_fn:
         resp = client.post(
             "/webhooks/jira/sprint-end?team_id=1",
@@ -180,7 +181,8 @@ def test_webhook_triggers_on_sprint_closed():
 
 def test_webhook_ignores_other_events():
     body = json.dumps({"webhookEvent": "jira:issue_created", "issue": {"id": "10001"}}).encode()
-    with patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team):
+    with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
+         patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team):
         resp = client.post(
             "/webhooks/jira/sprint-end?team_id=1",
             content=body,
@@ -194,14 +196,16 @@ def test_webhook_404_when_no_jira_token():
     no_token_data = MagicMock(id=1, manager_id=1, jira_token=None, jira_cloud_id=None)
     no_token_team = {**mock_team, "team_data": no_token_data}
     body = json.dumps(_SPRINT_CLOSED).encode()
-    with patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=no_token_team):
+    with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
+         patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=no_token_team):
         resp = client.post("/webhooks/jira/sprint-end?team_id=1", content=body)
     assert resp.status_code == 404
 
 
 def test_webhook_404_team_not_found():
     body = json.dumps(_SPRINT_CLOSED).encode()
-    with patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=None):
+    with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
+         patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=None):
         resp = client.post("/webhooks/jira/sprint-end?team_id=999", content=body)
     assert resp.status_code == 404
 
@@ -234,7 +238,8 @@ def test_webhook_accepts_valid_signature():
 
 def test_webhook_deduplicates_same_sprint_id():
     body = json.dumps(_SPRINT_CLOSED).encode()
-    with patch.dict("app.routers.jira_router._SEEN_SPRINT_IDS", {"42": time.time()}), \
+    with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
+         patch.dict("app.routers.jira_router._SEEN_SPRINT_IDS", {"42": time.time()}), \
          patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team), \
          patch("app.routers.jira_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_fn:
         resp = client.post(
