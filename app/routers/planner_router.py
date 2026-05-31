@@ -1,3 +1,4 @@
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -14,12 +15,33 @@ from app.services.planner_service import (
     PLANNER_WEBHOOK_SECRET,
     create_graph_subscription,
     delete_graph_subscription,
+    get_task,
     renew_graph_subscription,
 )
 from app.services.report_scheduler import send_sprint_end_reminder_teams
 from app.utils.logger import logger
 
 router = APIRouter(tags=["planner"])
+
+_SEEN_TASK_IDS: dict[str, float] = {}
+_DEDUP_TTL_SECONDS = 60
+_SPRINT_END_KEYWORDS = {"fim", "end", "terminou", "encerrado"}
+
+
+def _is_sprint_end_sentinel(title: str) -> bool:
+    lower = title.lower()
+    return "sprint" in lower and any(kw in lower for kw in _SPRINT_END_KEYWORDS)
+
+
+def _is_duplicate(task_id: str) -> bool:
+    now = time.time()
+    expired = [k for k, v in _SEEN_TASK_IDS.items() if now - v >= _DEDUP_TTL_SECONDS]
+    for k in expired:
+        del _SEEN_TASK_IDS[k]
+    if task_id in _SEEN_TASK_IDS:
+        return True
+    _SEEN_TASK_IDS[task_id] = now
+    return False
 
 
 @router.post("/webhooks/planner/plan-completed")
@@ -38,6 +60,7 @@ async def planner_notification(
     team = team_crud.get_team_by_id(db, team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found.")
+    team_data = team["team_data"]
 
     try:
         body = await request.json()
@@ -45,14 +68,22 @@ async def planner_notification(
         logger.warning(f"Malformed JSON in planner webhook for team {team_id}")
         return Response(status_code=202)
 
-    triggered = False
     for notification in body.get("value", []):
         if notification.get("clientState") != PLANNER_WEBHOOK_SECRET:
             raise HTTPException(status_code=401, detail="Invalid clientState")
-        resource_data = notification.get("resourceData", {})
-        if resource_data.get("percentComplete") == 100 and not triggered:
+
+        task_id = notification.get("resourceData", {}).get("id")
+        if not task_id or not team_data.teams_tenant_id:
+            continue
+        if _is_duplicate(task_id):
+            continue
+
+        task = await get_task(team_data.teams_tenant_id, task_id)
+        if task is None:
+            continue
+        if task.get("percentComplete") == 100 and _is_sprint_end_sentinel(task.get("title", "")):
             background_tasks.add_task(send_sprint_end_reminder_teams, team_id)
-            triggered = True
+            break  # one RF01 per batch
 
     return Response(status_code=202)
 

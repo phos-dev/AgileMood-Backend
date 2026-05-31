@@ -71,45 +71,6 @@ def test_delete_graph_subscription_returns_true_on_success():
     assert result is True
 
 
-def test_webhook_triggers_rf01_and_teams_dm_sent(team_with_tenant, manager, db):
-    """Full RF01 flow: POST notification → send_sprint_end_reminder_teams → Teams DM."""
-    # Add manager as team member so they receive the DM
-    from app.schemas.team_schema import user_teams
-    db.execute(
-        user_teams.insert().values(user_id=manager.id, team_id=team_with_tenant.id)
-    )
-    db.commit()
-
-    notification_body = {
-        "value": [{
-            "clientState": "planner-secret-changeme",
-            "resourceData": {"percentComplete": 100},
-        }]
-    }
-
-    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
-         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-tok"), \
-         patch("app.services.report_scheduler.resolve_teams_user", new_callable=AsyncMock, return_value="aad-id-123"), \
-         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_dm:
-        resp = client.post(
-            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
-            json=notification_body,
-        )
-
-    assert resp.status_code == 202
-    mock_dm.assert_called_once()
-    call_args = mock_dm.call_args[0]
-    assert call_args[2] == "aad-id-123"  # teams_user_id resolved
-
-    # Cleanup member
-    db.execute(
-        user_teams.delete().where(
-            (user_teams.c.user_id == manager.id) & (user_teams.c.team_id == team_with_tenant.id)
-        )
-    )
-    db.commit()
-
-
 def test_webhook_returns_validation_token():
     resp = client.post(
         "/webhooks/planner/plan-completed?team_id=1&validationToken=hello-world",
@@ -121,7 +82,7 @@ def test_webhook_returns_validation_token():
 
 
 def test_webhook_rejects_invalid_client_state(team_with_tenant):
-    body = {"value": [{"clientState": "wrong-secret", "resourceData": {"percentComplete": 100}}]}
+    body = {"value": [{"clientState": "wrong-secret", "resourceData": {"id": "task-1"}}]}
     with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "correct-secret"):
         resp = client.post(
             f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
@@ -130,21 +91,105 @@ def test_webhook_rejects_invalid_client_state(team_with_tenant):
     assert resp.status_code == 401
 
 
-def test_webhook_ignores_incomplete_task(team_with_tenant):
-    body = {
+def test_webhook_triggers_rf01_on_sentinel_task_complete(team_with_tenant, manager, db):
+    """Sentinel task (title with 'sprint' + end keyword) at 100% → triggers RF01."""
+    from app.schemas.team_schema import user_teams
+    db.execute(user_teams.insert().values(user_id=manager.id, team_id=team_with_tenant.id))
+    db.commit()
+
+    notification_body = {
         "value": [{
             "clientState": "planner-secret-changeme",
-            "resourceData": {"percentComplete": 50},
+            "resourceData": {"@odata.type": "#microsoft.graph.plannerTask", "id": "task-sentinel-1"},
         }]
     }
+    mock_task = {"id": "task-sentinel-1", "title": "Sprint 3 - Fim", "percentComplete": 100}
+
     with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
+         patch("app.routers.planner_router.get_task", new_callable=AsyncMock, return_value=mock_task), \
+         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-tok"), \
+         patch("app.services.report_scheduler.resolve_teams_user", new_callable=AsyncMock, return_value="aad-id"), \
+         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_dm:
+        resp = client.post(
+            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
+            json=notification_body,
+        )
+
+    assert resp.status_code == 202
+    mock_dm.assert_called_once()
+
+    db.execute(
+        user_teams.delete().where(
+            (user_teams.c.user_id == manager.id) & (user_teams.c.team_id == team_with_tenant.id)
+        )
+    )
+    db.commit()
+
+
+def test_webhook_ignores_non_sentinel_task_complete(team_with_tenant):
+    """Regular task completion (no sentinel keywords) → no RF01."""
+    notification_body = {
+        "value": [{
+            "clientState": "planner-secret-changeme",
+            "resourceData": {"@odata.type": "#microsoft.graph.plannerTask", "id": "task-regular-1"},
+        }]
+    }
+    mock_task = {"id": "task-regular-1", "title": "Fix login bug", "percentComplete": 100}
+
+    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
+         patch("app.routers.planner_router.get_task", new_callable=AsyncMock, return_value=mock_task), \
          patch("app.routers.planner_router.send_sprint_end_reminder_teams") as mock_rf01:
         resp = client.post(
             f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
-            json=body,
+            json=notification_body,
         )
+
     assert resp.status_code == 202
     mock_rf01.assert_not_called()
+
+
+def test_webhook_ignores_sentinel_task_not_complete(team_with_tenant):
+    """Sentinel task not at 100% → no RF01."""
+    notification_body = {
+        "value": [{
+            "clientState": "planner-secret-changeme",
+            "resourceData": {"@odata.type": "#microsoft.graph.plannerTask", "id": "task-sentinel-2"},
+        }]
+    }
+    mock_task = {"id": "task-sentinel-2", "title": "Sprint 3 - Fim", "percentComplete": 50}
+
+    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
+         patch("app.routers.planner_router.get_task", new_callable=AsyncMock, return_value=mock_task), \
+         patch("app.routers.planner_router.send_sprint_end_reminder_teams") as mock_rf01:
+        resp = client.post(
+            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
+            json=notification_body,
+        )
+
+    assert resp.status_code == 202
+    mock_rf01.assert_not_called()
+
+
+def test_webhook_deduplicates_same_task(team_with_tenant):
+    """Same task ID within 60s window → RF01 fires only once."""
+    notification_body = {
+        "value": [
+            {"clientState": "planner-secret-changeme", "resourceData": {"id": "task-dedup-unique-1"}},
+            {"clientState": "planner-secret-changeme", "resourceData": {"id": "task-dedup-unique-1"}},
+        ]
+    }
+    mock_task = {"id": "task-dedup-unique-1", "title": "Sprint 4 - End", "percentComplete": 100}
+
+    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
+         patch("app.routers.planner_router.get_task", new_callable=AsyncMock, return_value=mock_task), \
+         patch("app.routers.planner_router.send_sprint_end_reminder_teams") as mock_rf01:
+        resp = client.post(
+            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
+            json=notification_body,
+        )
+
+    assert resp.status_code == 202
+    mock_rf01.assert_called_once()
 
 
 def test_subscribe_requires_teams_tenant(team, manager_token, db):
