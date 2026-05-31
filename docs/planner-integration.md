@@ -11,7 +11,7 @@ O AgileMood oferece uma aba interativa no canal do Teams onde o Planner está em
 ### Como Funciona
 
 - **Aba AgileMood no canal Teams** — qualquer membro do canal pode registrar seu sentimento anonimamente, ver mensagens do gestor e, no caso do gestor, visualizar o dashboard do time
-- **RF01 automático** — quando uma tarefa de um plano do Planner é marcada como concluída (100%), o AgileMood envia um lembrete de check-in via DM para todos os membros do time
+- **RF01 automático** — quando uma tarefa sentinela de fim de sprint (com nome contendo "sprint" e uma das palavras: "fim", "end", "terminou" ou "encerrado") é marcada como concluída (100%), o AgileMood envia um lembrete de check-in via DM para todos os membros do time
 - **Privacidade garantida** — todos os registros feitos pela aba são forçadamente anônimos; nenhum dado individual é enviado ao backend
 
 ### Pré-requisitos
@@ -59,7 +59,23 @@ Resposta esperada:
 
 A subscrição é renovada automaticamente a cada 48 horas pelo AgileMood. Não é necessário renovar manualmente.
 
-### Passo 3: Usar a Aba AgileMood
+### Passo 3: Criar Tarefa Sentinela de Fim de Sprint
+
+O AgileMood dispara RF01 automaticamente quando uma tarefa sentinela é concluída. Para cada sprint, crie uma tarefa no plano inscrito com um nome que contenha:
+- A palavra **"sprint"** (qualquer capitalização)
+- **E** uma das palavras: **"fim"**, **"end"**, **"terminou"** ou **"encerrado"**
+
+**Exemplos válidos:**
+- `Sprint 3 - Fim`
+- `Sprint 10 - Encerrado`
+- `Sprint 1 - End`
+- `Sprint 2 terminou`
+
+Quando o gestor (ou qualquer membro) marcar essa tarefa como 100% concluída no Planner, o AgileMood enviará automaticamente um lembrete de check-in via DM para todos os membros do time.
+
+> **Nota:** Tarefas regulares (sem as palavras-chave) não disparam o RF01, independentemente do percentual de conclusão.
+
+### Passo 4: Usar a Aba AgileMood
 
 #### Para membros do time
 
