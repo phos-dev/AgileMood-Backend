@@ -116,7 +116,11 @@ export default function RF06RegisterFeeling() {
 
   return (
     <Stack space="space.200">
-      {!isAnonymous && (
+      {isAnonymous ? (
+        <SectionMessage title="Envio anônimo" appearance="information" actions={[]} testId="sm-anon">
+          <Text>Seu registro não conterá nenhum dado pessoal.</Text>
+        </SectionMessage>
+      ) : (
         <SectionMessage title="Envio identificado" appearance="warning" actions={[]} testId="sm-ident">
           <Text>O gestor poderá ver sua identidade.</Text>
         </SectionMessage>
