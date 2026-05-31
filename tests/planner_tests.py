@@ -69,3 +69,42 @@ def test_delete_graph_subscription_returns_true_on_success():
             delete_graph_subscription("tenant-1", "sub-abc")
         )
     assert result is True
+
+
+def test_webhook_triggers_rf01_and_teams_dm_sent(team_with_tenant, manager, db):
+    """Full RF01 flow: POST notification → send_sprint_end_reminder_teams → Teams DM."""
+    # Add manager as team member so they receive the DM
+    from app.schemas.team_schema import user_teams
+    db.execute(
+        user_teams.insert().values(user_id=manager.id, team_id=team_with_tenant.id)
+    )
+    db.commit()
+
+    notification_body = {
+        "value": [{
+            "clientState": "planner-secret-changeme",
+            "resourceData": {"percentComplete": 100},
+        }]
+    }
+
+    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
+         patch("app.services.report_scheduler.get_bot_token", new_callable=AsyncMock, return_value="bot-tok"), \
+         patch("app.services.report_scheduler.resolve_teams_user", new_callable=AsyncMock, return_value="aad-id-123"), \
+         patch("app.services.report_scheduler.teams_send_dm", new_callable=AsyncMock, return_value=True) as mock_dm:
+        resp = client.post(
+            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
+            json=notification_body,
+        )
+
+    assert resp.status_code == 202
+    mock_dm.assert_called_once()
+    call_args = mock_dm.call_args[0]
+    assert call_args[2] == "aad-id-123"  # teams_user_id resolved
+
+    # Cleanup member
+    db.execute(
+        user_teams.delete().where(
+            (user_teams.c.user_id == manager.id) & (user_teams.c.team_id == team_with_tenant.id)
+        )
+    )
+    db.commit()

@@ -24,6 +24,7 @@ from app.services.teams_service import (
     get_bot_token,
     send_dm as teams_send_dm,
 )
+from app.schemas.team_schema import Team
 from app.utils.logger import logger
 
 
@@ -257,6 +258,24 @@ async def send_weekly_teams_reminders():
                     f"Error sending Teams reminders for team {team.id} ({team.name!r}): {exc}",
                     exc_info=True,
                 )
+    finally:
+        db.close()
+
+
+async def send_sprint_end_reminder_teams(team_id: int) -> None:
+    db = SessionLocal()
+    try:
+        team = db.query(Team).filter(Team.id == team_id).first()
+        if not team or not team.teams_tenant_id:
+            return
+        bot_token = await get_bot_token()
+        card = build_reminder_card()
+        for member in team.members:
+            teams_user_id = await resolve_teams_user(team.teams_tenant_id, member)
+            if teams_user_id:
+                await teams_send_dm(bot_token, team.teams_tenant_id, teams_user_id, card)
+    except Exception as e:
+        logger.error(f"send_sprint_end_reminder_teams failed for team {team_id}: {e}")
     finally:
         db.close()
 
