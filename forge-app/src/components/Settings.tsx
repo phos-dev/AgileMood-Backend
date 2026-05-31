@@ -109,6 +109,7 @@ export default function Settings({ onLogin }: SettingsProps) {
       />
       <Textfield
         name="password"
+        type="password"
         placeholder="Senha"
         value={password}
         onChange={(e: any) => setPassword(e.target?.value ?? e)}
