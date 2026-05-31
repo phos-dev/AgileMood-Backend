@@ -108,3 +108,113 @@ def test_webhook_triggers_rf01_and_teams_dm_sent(team_with_tenant, manager, db):
         )
     )
     db.commit()
+
+
+def test_webhook_returns_validation_token():
+    resp = client.post(
+        "/webhooks/planner/plan-completed?team_id=1&validationToken=hello-world",
+        content=b"",
+    )
+    assert resp.status_code == 200
+    assert resp.text == "hello-world"
+    assert "text/plain" in resp.headers["content-type"]
+
+
+def test_webhook_rejects_invalid_client_state(team_with_tenant):
+    body = {"value": [{"clientState": "wrong-secret", "resourceData": {"percentComplete": 100}}]}
+    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "correct-secret"):
+        resp = client.post(
+            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
+            json=body,
+        )
+    assert resp.status_code == 401
+
+
+def test_webhook_ignores_incomplete_task(team_with_tenant):
+    body = {
+        "value": [{
+            "clientState": "planner-secret-changeme",
+            "resourceData": {"percentComplete": 50},
+        }]
+    }
+    with patch("app.routers.planner_router.PLANNER_WEBHOOK_SECRET", "planner-secret-changeme"), \
+         patch("app.routers.planner_router.send_sprint_end_reminder_teams") as mock_rf01:
+        resp = client.post(
+            f"/webhooks/planner/plan-completed?team_id={team_with_tenant.id}",
+            json=body,
+        )
+    assert resp.status_code == 202
+    mock_rf01.assert_not_called()
+
+
+def test_subscribe_requires_teams_tenant(team, manager_token, db):
+    """Returns 400 when team has no teams_tenant_id."""
+    assert team.teams_tenant_id is None
+    resp = client.post(
+        f"/integrations/planner/subscribe?team_id={team.id}",
+        json={"plan_id": "plan-abc"},
+        headers={"Authorization": f"Bearer {manager_token}"},
+    )
+    assert resp.status_code == 400
+
+
+def test_subscribe_non_manager_forbidden(team_with_tenant, employee, employee_token, db):
+    """Returns 403 when employee tries to subscribe."""
+    resp = client.post(
+        f"/integrations/planner/subscribe?team_id={team_with_tenant.id}",
+        json={"plan_id": "plan-abc"},
+        headers={"Authorization": f"Bearer {employee_token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_subscribe_creates_subscription_and_persists(team_with_tenant, manager_token, db):
+    """Subscribe endpoint: calls Graph API and stores subscription_id in DB."""
+    with patch("app.routers.planner_router.create_graph_subscription", new_callable=AsyncMock, return_value="sub-new-789"):
+        resp = client.post(
+            f"/integrations/planner/subscribe?team_id={team_with_tenant.id}",
+            json={"plan_id": "plan-abc"},
+            headers={"Authorization": f"Bearer {manager_token}"},
+        )
+    assert resp.status_code == 200
+    assert resp.json()["subscription_id"] == "sub-new-789"
+    # DB reflects the new subscription
+    db.refresh(team_with_tenant)
+    assert team_with_tenant.planner_subscription_id == "sub-new-789"
+
+
+def test_renew_returns_404_when_no_subscription(team_with_tenant, manager_token, db):
+    assert team_with_tenant.planner_subscription_id is None
+    resp = client.post(
+        f"/integrations/planner/renew?team_id={team_with_tenant.id}",
+        headers={"Authorization": f"Bearer {manager_token}"},
+    )
+    assert resp.status_code == 404
+
+
+def test_renew_existing_subscription(team_with_tenant, manager_token, db):
+    team_with_tenant.planner_subscription_id = "sub-existing"
+    db.commit()
+
+    with patch("app.routers.planner_router.renew_graph_subscription", new_callable=AsyncMock, return_value=True):
+        resp = client.post(
+            f"/integrations/planner/renew?team_id={team_with_tenant.id}",
+            headers={"Authorization": f"Bearer {manager_token}"},
+        )
+    assert resp.status_code == 200
+    assert resp.json()["renewed"] is True
+
+
+def test_unsubscribe_clears_subscription_in_db(team_with_tenant, manager_token, db):
+    team_with_tenant.planner_subscription_id = "sub-to-remove"
+    db.commit()
+
+    with patch("app.routers.planner_router.delete_graph_subscription", new_callable=AsyncMock, return_value=True):
+        resp = client.delete(
+            f"/integrations/planner/unsubscribe?team_id={team_with_tenant.id}",
+            headers={"Authorization": f"Bearer {manager_token}"},
+        )
+    assert resp.status_code == 200
+    # DB cleared
+    db.refresh(team_with_tenant)
+    assert team_with_tenant.planner_subscription_id is None
