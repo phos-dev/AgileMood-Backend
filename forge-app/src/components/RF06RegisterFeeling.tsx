@@ -112,7 +112,6 @@ export default function RF06RegisterFeeling() {
 
   return (
     <Stack space="space.200">
-      <Text><Strong>Registrar Sentimento</Strong></Text>
       {isAnonymous ? (
         <SectionMessage title="Envio anônimo" appearance="information" actions={[]} testId="sm-anon">
           <Text>Seu registro não conterá nenhum dado pessoal.</Text>

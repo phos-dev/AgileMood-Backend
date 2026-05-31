@@ -80,8 +80,7 @@ export default function Settings({ onLogin }: SettingsProps) {
     const teamDisplay = settings.teamName || (settings.teamId ? String(settings.teamId) : null);
     return (
       <Stack space="space.200">
-        <Text><Strong>Configurações AgileMood</Strong></Text>
-        <SectionMessage title="Conectado" appearance="confirmation" actions={[]} testId="sm-ok">
+          <SectionMessage title="Conectado" appearance="confirmation" actions={[]} testId="sm-ok">
           <Text>{settings.name || settings.email} — <Strong>{roleLabel}</Strong></Text>
           <Text>Equipe: {teamDisplay ?? '—'}</Text>
         </SectionMessage>
@@ -97,7 +96,6 @@ export default function Settings({ onLogin }: SettingsProps) {
 
   return (
     <Stack space="space.200">
-      <Text><Strong>Configurações AgileMood</Strong></Text>
       {error && (
         <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
           <Text> </Text>

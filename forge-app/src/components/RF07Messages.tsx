@@ -60,7 +60,6 @@ export default function RF07Messages() {
 
   return (
     <Stack space="space.200">
-      <Text><Strong>Mensagens Recebidas</Strong> — somente leitura</Text>
       <DynamicTable head={head} rows={rows} />
     </Stack>
   );

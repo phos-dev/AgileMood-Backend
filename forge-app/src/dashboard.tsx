@@ -25,9 +25,9 @@ const App = () => {
   return (
     <Tabs id="agilemood-tabs">
       <TabList>
-        {role === 'manager' && <Tab>Dashboard</Tab>}
+        {role === 'manager' && <Tab>Dashboard - Humor da Equipe</Tab>}
         {role === 'employee' && <Tab>Registrar Sentimento</Tab>}
-        {role === 'employee' && <Tab>Mensagens</Tab>}
+        {role === 'employee' && <Tab>Mensagens Recebidas</Tab>}
         <Tab>Configurações</Tab>
       </TabList>
       {role === 'manager' && <TabPanel><RF03Dashboard /></TabPanel>}

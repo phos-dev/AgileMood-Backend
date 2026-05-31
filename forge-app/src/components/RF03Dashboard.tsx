@@ -81,7 +81,6 @@ export default function RF03Dashboard() {
 
   return (
     <Stack space="space.200">
-      <Text><Strong>Dashboard AgileMood — Humor da Equipe</Strong></Text>
       <DatePicker name="startDate" onChange={(v: string) => setStartDate(v)} />
       <DatePicker name="endDate" onChange={(v: string) => setEndDate(v)} />
       <Button type="button" onClick={handleSubmit}>{loading ? 'Carregando...' : 'Carregar'}</Button>
