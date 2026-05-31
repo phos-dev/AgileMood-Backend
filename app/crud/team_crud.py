@@ -200,6 +200,19 @@ def update_jira_credentials(db: Session, team_id: int, token: str | None, cloud_
     return db_team
 
 
+def update_planner_subscription_id(db: Session, team_id: int, subscription_id: str | None):
+    """Sets or clears the Microsoft Planner subscription ID for a team."""
+    db_team = db.query(Team).filter(Team.id == team_id).first()
+    if db_team is None:
+        logger.error(f"Team with ID {team_id} not found.")
+        return None
+    db_team.planner_subscription_id = subscription_id
+    db.commit()
+    db.refresh(db_team)
+    logger.debug(f"Planner subscription ID updated for team {team_id}.")
+    return db_team
+
+
 def update_teams_tenant_id(db: Session, team_id: int, tenant_id: str | None):
     """
     Sets or clears the Microsoft Teams tenant ID for a team.

@@ -26,6 +26,7 @@ class Team(db.Base):
     trello_token = Column(String, nullable=True)
     jira_token = Column(String, nullable=True)
     jira_cloud_id = Column(String, nullable=True)
+    planner_subscription_id = Column(String, nullable=True)
 
     manager = relationship("User", back_populates="managed_teams")
 

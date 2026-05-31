@@ -22,6 +22,7 @@ class TeamData(Team):
     trello_token: Optional[str] = None
     jira_token: Optional[str] = None
     jira_cloud_id: Optional[str] = None
+    planner_subscription_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -50,6 +51,10 @@ class TrelloConnectRequest(BaseModel):
 class JiraConnectRequest(BaseModel):
     jira_token: str
     jira_cloud_id: str
+
+
+class PlannerSubscribeRequest(BaseModel):
+    plan_id: str
 
 
 class TeamResponse(BaseModel):
