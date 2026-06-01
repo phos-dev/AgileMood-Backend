@@ -319,3 +319,35 @@ async def test_renewal_job_skips_teams_without_subscription(team, db):
     # None of the calls should reference this team's (non-existent) subscription
     for call in mock_renew.call_args_list:
         assert call[0][1] is not None
+
+
+# ---- _extract_plan_id ----
+
+def test_extract_plan_id_from_pure_id():
+    from app.routers.planner_router import _extract_plan_id
+    assert _extract_plan_id("aBcDeFgH1234") == "aBcDeFgH1234"
+
+
+def test_extract_plan_id_from_tasks_office_url():
+    from app.routers.planner_router import _extract_plan_id
+    url = "https://tasks.office.com/tenant/Home/Planner/#/plantaskboard?groupId=xxx&planId=aBcDeFgH1234"
+    assert _extract_plan_id(url) == "aBcDeFgH1234"
+
+
+def test_extract_plan_id_from_query_string():
+    from app.routers.planner_router import _extract_plan_id
+    assert _extract_plan_id("https://example.com?planId=xyz-999") == "xyz-999"
+
+
+def test_subscribe_accepts_full_url(team_with_tenant, manager_token, db):
+    """Subscribe endpoint extracts plan_id from a full Planner URL."""
+    full_url = "https://tasks.office.com/tenant/Home/Planner/#/plantaskboard?groupId=grp&planId=plan-from-url"
+    with patch("app.routers.planner_router.create_graph_subscription", new_callable=AsyncMock, return_value="sub-url-test") as mock_create:
+        resp = client.post(
+            f"/integrations/planner/subscribe?team_id={team_with_tenant.id}",
+            json={"plan_id": full_url},
+            headers={"Authorization": f"Bearer {manager_token}"},
+        )
+    assert resp.status_code == 200
+    call_args = mock_create.call_args[0]
+    assert call_args[2] == "plan-from-url"

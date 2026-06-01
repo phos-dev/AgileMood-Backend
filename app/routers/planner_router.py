@@ -1,3 +1,4 @@
+import re
 import time
 from typing import Annotated
 
@@ -26,6 +27,13 @@ router = APIRouter(tags=["planner"])
 _SEEN_TASK_IDS: dict[str, float] = {}
 _DEDUP_TTL_SECONDS = 60
 _SPRINT_END_KEYWORDS = {"fim", "end", "terminou", "encerrado"}
+_PLAN_ID_RE = re.compile(r"[?&#]planId=([A-Za-z0-9_\-]+)")
+
+
+def _extract_plan_id(value: str) -> str:
+    """Return plan_id from a full Planner URL or the value itself if already an ID."""
+    match = _PLAN_ID_RE.search(value)
+    return match.group(1) if match else value.strip()
 
 
 def _is_sprint_end_sentinel(title: str) -> bool:
@@ -102,7 +110,7 @@ async def subscribe_planner(
     team_data = team["team_data"]
     if not team_data.teams_tenant_id:
         raise HTTPException(status_code=400, detail="Teams integration required before subscribing to Planner.")
-    subscription_id = await create_graph_subscription(team_data.teams_tenant_id, team_id, body.plan_id)
+    subscription_id = await create_graph_subscription(team_data.teams_tenant_id, team_id, _extract_plan_id(body.plan_id))
     team_crud.update_planner_subscription_id(db, team_id, subscription_id)
     return {"subscription_id": subscription_id}
 
