@@ -37,19 +37,26 @@ A aba AgileMood aparecerá no canal com as opções **Registrar**, **Mensagens**
 
 Para que o AgileMood dispare lembretes ao concluir tarefas do Planner, é necessário registrar uma subscrição no Microsoft Graph.
 
-**Obtenha o ID do plano do Planner:**
+**Obtenha o link do plano do Planner:**
 
 1. Abra o Planner no Teams
 2. Selecione o plano desejado
-3. Copie a URL — o ID do plano é o valor após `/plan/` (ex: `aBcDeFgH1234...`)
+3. Copie a URL da barra de endereços (ex: `https://tasks.office.com/.../plantaskboard?groupId=xxx&planId=aBcDeFgH1234`)
 
-**Registre a subscrição via API:**
+**Registre a subscrição** — cole a URL completa ou apenas o ID do plano:
 
 ```bash
+# Opção 1 — URL completa (mais fácil, copie direto da barra de endereços)
 curl -X POST "https://<seu-backend>/integrations/planner/subscribe?team_id=<id_do_time>" \
   -H "Authorization: Bearer <seu_token>" \
   -H "Content-Type: application/json" \
-  -d '{"plan_id": "<id_do_plano>"}'
+  -d '{"plan_id": "https://tasks.office.com/.../plantaskboard?groupId=xxx&planId=aBcDeFgH1234"}'
+
+# Opção 2 — apenas o ID (ex: aBcDeFgH1234)
+curl -X POST "https://<seu-backend>/integrations/planner/subscribe?team_id=<id_do_time>" \
+  -H "Authorization: Bearer <seu_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"plan_id": "aBcDeFgH1234"}'
 ```
 
 Resposta esperada:
