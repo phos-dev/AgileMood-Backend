@@ -109,4 +109,42 @@ resolver.define('getMessages', async ({ payload }) => {
   return Array.isArray(data) ? data : data.feedbacks || [];
 });
 
+resolver.define('getSprintToken', async ({ payload }) => {
+  const { teamId, jwtToken } = payload;
+  const tokenResp = await api.fetch(`${API_URL}/teams/${teamId}/current-sprint-token`, {
+    headers: { Authorization: `Bearer ${jwtToken}` },
+  });
+  if (tokenResp.status === 404) return { status: 'no_active_sprint' };
+  if (!tokenResp.ok) throw new Error(`${tokenResp.status}`);
+  const { sprint_token, sprint_number } = await tokenResp.json();
+
+  const stateResp = await api.fetch(`${API_URL}/questionnaire/${sprint_token}`, {
+    headers: { Authorization: `Bearer ${jwtToken}` },
+  });
+  if (stateResp.status === 410) return { status: 'expired', sprint_token, sprint_number };
+  if (!stateResp.ok) throw new Error(`state: ${stateResp.status}`);
+  const state = await stateResp.json();
+  return { ...state, sprint_token, sprint_number };
+});
+
+resolver.define('submitPsQuestionnaire', async ({ payload }) => {
+  const { jwtToken, sprint_token, answers } = payload;
+  const resp = await api.fetch(`${API_URL}/questionnaire/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwtToken}` },
+    body: JSON.stringify({ sprint_token, answers }),
+  });
+  if (!resp.ok) throw new Error(`${resp.status}`);
+  return { success: true };
+});
+
+resolver.define('getPsReport', async ({ payload }) => {
+  const { teamId, jwtToken } = payload;
+  const resp = await api.fetch(`${API_URL}/reports/psychological-safety?team_id=${teamId}`, {
+    headers: { Authorization: `Bearer ${jwtToken}` },
+  });
+  if (!resp.ok) throw new Error(`${resp.status}`);
+  return await resp.json();
+});
+
 export const handler = resolver.getDefinitions();

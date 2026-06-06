@@ -331,6 +331,89 @@ def build_reminder_card() -> dict:
     }
 
 
+def build_sprint_end_questionnaire_card(sprint_number: int, url: str) -> dict:
+    return {
+        "type":    "AdaptiveCard",
+        "version": "1.3",
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "body": [
+            {
+                "type":   "TextBlock",
+                "text":   f"📋 Sprint {sprint_number} encerrou!",
+                "weight": "Bolder",
+                "size":   "Medium",
+                "wrap":   True,
+            },
+            {
+                "type": "TextBlock",
+                "text": "Responda o questionário de Segurança Psicológica do time. Leva ~2 minutos. Respostas anônimas. Prazo: 48h.",
+                "wrap": True,
+            },
+        ],
+        "actions": [
+            {
+                "type":  "Action.OpenUrl",
+                "title": "Responder agora →",
+                "url":   url,
+            }
+        ],
+    }
+
+
+async def send_sprint_end_reminder(team_id: int, questionnaire_url: str | None = None, sprint_number: int | None = None) -> None:
+    """
+    Sends an RF01 questionnaire DM via Teams to all members of a team when a sprint ends.
+    Creates its own DB session (called as a background task from the webhook handler).
+    """
+    from app.databases.postgres_database import SessionLocal
+    from app.schemas.team_schema import Team as TeamSchema
+
+    db = SessionLocal()
+    try:
+        team = db.query(TeamSchema).filter(TeamSchema.id == team_id).first()
+        if not team or not team.teams_tenant_id:
+            logger.warning(f"Teams sprint-end reminder skipped for team {team_id}: no tenant ID.")
+            return
+
+        try:
+            bot_token = await get_bot_token()
+        except Exception as exc:
+            logger.error(f"Teams sprint-end reminder: failed to get bot token for team {team_id}: {exc}")
+            return
+
+        if questionnaire_url and sprint_number is not None:
+            card = build_sprint_end_questionnaire_card(sprint_number, questionnaire_url)
+        else:
+            card = build_reminder_card()
+
+        unreachable = []
+        for member in team.members:
+            teams_user_id = await resolve_teams_user(team.teams_tenant_id, member)
+            if teams_user_id:
+                success = await send_dm(bot_token, team.teams_tenant_id, teams_user_id, card)
+                if not success:
+                    logger.warning(f"Failed to send Teams sprint-end DM to {member.email}")
+            else:
+                unreachable.append(member.email)
+
+        if unreachable:
+            manager_teams_id = await resolve_teams_user(team.teams_tenant_id, team.manager)
+            if manager_teams_id:
+                notification = build_unreachable_notification_card(unreachable)
+                await send_dm(bot_token, team.teams_tenant_id, manager_teams_id, notification)
+            else:
+                logger.error(
+                    f"Manager of team {team_id} is also unreachable via Teams. "
+                    f"Cannot send sprint-end unreachable notification."
+                )
+
+        logger.debug(f"Teams sprint-end reminders sent for team {team_id}.")
+    except Exception as exc:
+        logger.error(f"Error sending Teams sprint-end reminders for team {team_id}: {exc}", exc_info=True)
+    finally:
+        db.close()
+
+
 def build_unreachable_notification_card(unreachable_emails: list[str]) -> dict:
     """
     Adaptive Card notifying the manager that some members could not be reached.

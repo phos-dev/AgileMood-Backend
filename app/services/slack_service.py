@@ -97,6 +97,33 @@ async def send_dm(token: str, slack_user_id: str, blocks: list[dict]) -> bool:
         return False
 
 
+def build_sprint_end_questionnaire_blocks(sprint_number: int, url: str) -> list[dict]:
+    return [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"📋 *Sprint {sprint_number} encerrou!*\n"
+                    "Responda o questionário de Segurança Psicológica do time.\n"
+                    "Leva ~2 minutos. Respostas anônimas. Prazo: 48h."
+                ),
+            },
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Responder agora →"},
+                    "url": url,
+                    "style": "primary",
+                }
+            ],
+        },
+    ]
+
+
 def build_reminder_blocks() -> list[dict]:
     """
     Block Kit payload for the weekly member reminder DM.
@@ -259,9 +286,9 @@ def build_weekly_report_blocks(
     return blocks
 
 
-async def send_sprint_end_reminder(team_id: int) -> None:
+async def send_sprint_end_reminder(team_id: int, questionnaire_url: str | None = None, sprint_number: int | None = None) -> None:
     """
-    Sends an RF01 reminder DM via Slack to all members of a team when a sprint ends.
+    Sends an RF01 questionnaire DM via Slack to all members of a team when a sprint ends.
     Creates its own DB session (called as a background task from the webhook handler).
     """
     from app.schemas.team_schema import Team as TeamSchema  # local import avoids circular dependency
@@ -274,7 +301,10 @@ async def send_sprint_end_reminder(team_id: int) -> None:
             return
 
         unreachable = []
-        reminder_blocks = build_reminder_blocks()
+        if questionnaire_url and sprint_number is not None:
+            reminder_blocks = build_sprint_end_questionnaire_blocks(sprint_number, questionnaire_url)
+        else:
+            reminder_blocks = build_reminder_blocks()
 
         for member in team.members:
             slack_id = await resolve_slack_user(team.slack_bot_token, member)

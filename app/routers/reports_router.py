@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from typing import Annotated
 from datetime import date
 
-from app.crud import reports_crud
+from app.crud import reports_crud, questionnaire_crud
 
 from app.models.user_model import UserInDB
 import app.models.reports_model as reports_model
+from app.models.sprint_model import PSReportResponse, PSScoreEntry
 from app.databases.postgres_database import get_db
 
 from app.routers.authentication import get_current_active_user
@@ -84,5 +85,19 @@ def get_anonymous_emotion_analysis_by_team(
         raise Errors.NO_PERMISSION
 
     response = reports_crud.get_anonymous_emotion_analysis(db, team_id, start_date, end_date)
-    
+
     return response
+
+
+@router.get("/psychological-safety", response_model=PSReportResponse)
+def get_psychological_safety_report(
+    team_id: int,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    if current_user.role != Role.MANAGER:
+        raise Errors.NO_PERMISSION
+
+    scores_raw = questionnaire_crud.get_ps_scores(db, team_id)
+    scores = [PSScoreEntry(**entry) for entry in scores_raw]
+    return PSReportResponse(scores=scores)

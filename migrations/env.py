@@ -1,10 +1,13 @@
 from logging.config import fileConfig
 import os
 
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+load_dotenv()
 
 config = context.config
 
@@ -23,6 +26,7 @@ import app.schemas.team_schema  # noqa: F401 - ensure Team model is registered
 import app.schemas.user_schema  # noqa: F401
 import app.schemas.emotion_record_schema  # noqa: F401
 import app.schemas.feedback_schema  # noqa: F401
+import app.schemas.sprint_schema  # noqa: F401
 target_metadata = Base.metadata
 
 

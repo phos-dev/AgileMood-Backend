@@ -166,9 +166,13 @@ _SPRINT_CLOSED = {
 
 def test_webhook_triggers_on_sprint_closed():
     body = json.dumps(_SPRINT_CLOSED).encode()
+    fake_sprint = MagicMock(id=99, sprint_number=1)
     with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
          patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team), \
-         patch("app.routers.jira_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_fn:
+         patch("app.routers.jira_router.questionnaire_crud.create_sprint", return_value=fake_sprint), \
+         patch("app.routers.jira_router.create_sprint_token", return_value="fake-sprint-token"), \
+         patch("app.routers.jira_router.slack_service.send_sprint_end_reminder", new_callable=AsyncMock) as mock_slack, \
+         patch("app.routers.jira_router.teams_service.send_sprint_end_reminder", new_callable=AsyncMock):
         resp = client.post(
             "/webhooks/jira/sprint-end?team_id=1",
             content=body,
@@ -176,7 +180,7 @@ def test_webhook_triggers_on_sprint_closed():
         )
     assert resp.status_code == 200
     assert "queued" in resp.json()["message"].lower()
-    mock_fn.assert_called_once_with(1)
+    mock_slack.assert_called_once()
 
 
 def test_webhook_ignores_other_events():
@@ -225,9 +229,13 @@ def test_webhook_rejects_invalid_signature():
 def test_webhook_accepts_valid_signature():
     body = json.dumps(_SPRINT_CLOSED).encode()
     sig = _jira_sig("mysecret", body)
+    fake_sprint = MagicMock(id=99, sprint_number=1)
     with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": "mysecret"}), \
          patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team), \
-         patch("app.routers.jira_router.send_sprint_end_reminder", new_callable=AsyncMock):
+         patch("app.routers.jira_router.questionnaire_crud.create_sprint", return_value=fake_sprint), \
+         patch("app.routers.jira_router.create_sprint_token", return_value="fake-sprint-token"), \
+         patch("app.routers.jira_router.slack_service.send_sprint_end_reminder", new_callable=AsyncMock), \
+         patch("app.routers.jira_router.teams_service.send_sprint_end_reminder", new_callable=AsyncMock):
         resp = client.post(
             "/webhooks/jira/sprint-end?team_id=1",
             content=body,
@@ -241,7 +249,7 @@ def test_webhook_deduplicates_same_sprint_id():
     with patch.dict("os.environ", {"JIRA_WEBHOOK_SECRET": ""}), \
          patch.dict("app.routers.jira_router._SEEN_SPRINT_IDS", {"42": time.time()}), \
          patch("app.routers.jira_router.team_crud.get_team_by_id", return_value=mock_team), \
-         patch("app.routers.jira_router.send_sprint_end_reminder", new_callable=AsyncMock) as mock_fn:
+         patch("app.routers.jira_router.slack_service.send_sprint_end_reminder", new_callable=AsyncMock) as mock_fn:
         resp = client.post(
             "/webhooks/jira/sprint-end?team_id=1",
             content=body,

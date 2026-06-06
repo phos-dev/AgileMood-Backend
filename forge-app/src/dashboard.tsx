@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ForgeReconciler, { Text, Tabs, Tab, TabList, TabPanel } from '@forge/react';
 import { invoke } from '@forge/bridge';
+import RF01PsQuestionnaire from './components/RF01PsQuestionnaire';
 import RF03Dashboard from './components/RF03Dashboard';
 import RF06RegisterFeeling from './components/RF06RegisterFeeling';
 import RF07Messages from './components/RF07Messages';
@@ -28,11 +29,13 @@ const App = () => {
         {role === 'manager' && <Tab>Dashboard - Humor da Equipe</Tab>}
         {role === 'employee' && <Tab>Registrar Sentimento</Tab>}
         {role === 'employee' && <Tab>Mensagens Recebidas</Tab>}
+        <Tab>Segurança Psicológica</Tab>
         <Tab>Configurações</Tab>
       </TabList>
       {role === 'manager' && <TabPanel><RF03Dashboard /></TabPanel>}
       {role === 'employee' && <TabPanel><RF06RegisterFeeling /></TabPanel>}
       {role === 'employee' && <TabPanel><RF07Messages /></TabPanel>}
+      <TabPanel><RF01PsQuestionnaire /></TabPanel>
       <TabPanel><Settings onLogin={reload} /></TabPanel>
     </Tabs>
   );

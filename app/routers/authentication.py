@@ -1,9 +1,9 @@
 import jwt
-from jwt.exceptions import InvalidTokenError
+from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -62,3 +62,23 @@ async def get_current_active_user(current_user: Annotated[UserInDB, Depends(get_
     if current_user.disabled:
         raise Errors.INACTIVE_USER
     return current_user
+
+
+SPRINT_TOKEN_EXPIRE_HOURS = 48
+
+
+def create_sprint_token(team_id: int, sprint_id: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=SPRINT_TOKEN_EXPIRE_HOURS)
+    payload = {"team_id": team_id, "sprint_id": sprint_id, "exp": expire}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_sprint_token(token: str) -> tuple[int, int]:
+    """Returns (team_id, sprint_id). Raises HTTPException on invalid or expired token."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["team_id"], payload["sprint_id"]
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=410, detail="Sprint token expired.")
+    except (InvalidTokenError, KeyError):
+        raise HTTPException(status_code=401, detail="Invalid sprint token.")

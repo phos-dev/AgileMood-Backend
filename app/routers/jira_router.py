@@ -10,12 +10,12 @@ from fastapi.routing import APIRouter
 from sqlalchemy.orm import Session
 
 from app.core.auth_utils import ensure_is_team_manager
-from app.crud import team_crud
+from app.crud import team_crud, questionnaire_crud
 from app.databases.postgres_database import get_db
 from app.models.team_model import JiraConnectRequest, TeamDataSafe
 from app.models.user_model import UserInDB
-from app.routers.authentication import get_current_active_user
-from app.services.slack_service import send_sprint_end_reminder
+from app.routers.authentication import get_current_active_user, create_sprint_token
+from app.services import slack_service, teams_service
 from app.utils.constants import Errors
 from app.utils.logger import logger
 
@@ -118,10 +118,16 @@ async def jira_sprint_end(
     if payload.get("webhookEvent") != "jira:sprint_closed":
         return {"message": "Event ignored."}
 
-    sprint_id = str(payload.get("sprint", {}).get("id", ""))
-    if sprint_id and _is_duplicate_sprint(sprint_id):
+    jira_sprint_id = str(payload.get("sprint", {}).get("id", ""))
+    if jira_sprint_id and _is_duplicate_sprint(jira_sprint_id):
         return {"message": "Duplicate event ignored."}
 
-    background_tasks.add_task(send_sprint_end_reminder, team_id)
-    logger.debug(f"Jira sprint-end webhook received for team {team_id}. Reminder queued.")
+    sprint = questionnaire_crud.create_sprint(db, team_id, jira_sprint_id=jira_sprint_id or None)
+    sprint_token = create_sprint_token(team_id, sprint.id)
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    questionnaire_url = f"{frontend_url}/questionnaire/{sprint_token}"
+
+    background_tasks.add_task(slack_service.send_sprint_end_reminder, team_id, questionnaire_url, sprint.sprint_number)
+    background_tasks.add_task(teams_service.send_sprint_end_reminder, team_id, questionnaire_url, sprint.sprint_number)
+    logger.debug(f"Jira sprint-end webhook received for team {team_id}. Reminders queued.")
     return {"message": "Sprint-end reminder queued."}

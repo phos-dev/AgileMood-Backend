@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.rate_limiter import limiter
 
 from app.schemas.user_schema import db
+import app.schemas.sprint_schema  # noqa: F401 — registers Sprint/PSResponse/PSDeduplication with Base
 from app.databases.postgres_database import Base, engine, get_db
 from app.routers.user_router import router as user_router
 from app.routers.emotion_router import router as emotion_router
@@ -21,6 +22,7 @@ from app.routers.trello_router import router as trello_router
 from app.routers.jira_router import router as jira_router
 from app.routers.teams_router import router as teams_router
 from app.routers.planner_router import router as planner_router
+from app.routers.questionnaire_router import router as questionnaire_router
 from app.services.report_scheduler import create_scheduler
 from dotenv import load_dotenv
 
@@ -63,6 +65,7 @@ app.include_router(trello_router)
 app.include_router(jira_router)
 app.include_router(teams_router)
 app.include_router(planner_router)
+app.include_router(questionnaire_router)
 
 app.mount("/powerup", StaticFiles(directory="app/static/powerup", html=True), name="powerup")
 
