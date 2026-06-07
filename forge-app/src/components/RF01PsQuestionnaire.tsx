@@ -208,6 +208,7 @@ export default function RF01PsQuestionnaire() {
         return (
           <Stack key={key} space="space.100">
             <Text>{idx + 1}. {question}</Text>
+            <Text>Resposta: <Strong>{answers[key]}</Strong></Text>
             <Range
               name={key}
               min={1}
@@ -216,7 +217,7 @@ export default function RF01PsQuestionnaire() {
               value={answers[key]}
               onChange={(v: number) => setAnswers((prev) => ({ ...prev, [key]: v }))}
             />
-            <Text>1 — Discordo totalmente &nbsp;·&nbsp; <Strong>{answers[key]}</Strong> selecionado &nbsp;·&nbsp; 5 — Concordo totalmente</Text>
+            <Text>1 — Discordo totalmente &nbsp;·&nbsp; 5 — Concordo totalmente</Text>
           </Stack>
         );
       })}
