@@ -5,12 +5,14 @@ import {
   Stack as RawStack,
   SectionMessage as RawSectionMessage,
   Range as RawRange,
+  DynamicTable as RawDynamicTable,
   Button,
 } from '@forge/react';
 const Strong = RawStrong as any;
 const Stack = RawStack as any;
 const SectionMessage = RawSectionMessage as any;
 const Range = RawRange as any;
+const DynamicTable = RawDynamicTable as any;
 import { invoke } from '@forge/bridge';
 
 const QUESTIONS = [
@@ -25,11 +27,21 @@ const QUESTIONS = [
 
 const SCALE_LABEL = '1 = Discordo totalmente · 5 = Concordo totalmente';
 
+const PS_REPORT_HEAD = {
+  cells: [
+    { key: 'sprint', content: 'Sprint' },
+    { key: 'responses', content: 'Respostas' },
+    { key: 'mean', content: 'Média (1–5)' },
+    { key: 'std', content: 'Desvio padrão' },
+  ],
+};
+
 export default function RF01PsQuestionnaire() {
   const [settings, setSettings] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
   const [sprintState, setSprintState] = useState<any>(null);
   const [sprintLoaded, setSprintLoaded] = useState(false);
+  const [report, setReport] = useState<any>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({
     q1: 3, q2: 3, q3: 3, q4: 3, q5: 3, q6: 3, q7: 3,
   });
@@ -40,12 +52,16 @@ export default function RF01PsQuestionnaire() {
     invoke<any>('getSettings').then((s: any) => {
       setSettings(s);
       setLoaded(true);
-      if (s?.jwtToken && s?.teamId) {
+      if (!s?.jwtToken || !s?.teamId) { setSprintLoaded(true); return; }
+
+      if (s.role === 'manager') {
+        invoke<any>('getPsReport', { teamId: s.teamId, jwtToken: s.jwtToken })
+          .then((r: any) => { setReport(r); setSprintLoaded(true); })
+          .catch(() => { setReport({ scores: [] }); setSprintLoaded(true); });
+      } else {
         invoke<any>('getSprintToken', { teamId: s.teamId, jwtToken: s.jwtToken })
           .then((state: any) => { setSprintState(state); setSprintLoaded(true); })
           .catch(() => { setSprintState({ status: 'no_active_sprint' }); setSprintLoaded(true); });
-      } else {
-        setSprintLoaded(true);
       }
     });
   }, []);
@@ -68,7 +84,35 @@ export default function RF01PsQuestionnaire() {
     );
   }
 
-  if (!sprintLoaded) return <Text>Carregando questionário...</Text>;
+  if (!sprintLoaded) return <Text>Carregando...</Text>;
+
+  if (settings.role === 'manager') {
+    const scores = report?.scores ?? [];
+    return (
+      <Stack space="space.200">
+        <Text><Strong>Segurança Psicológica — Histórico por Sprint</Strong></Text>
+        <Text>Pontuação de 1 a 5 · itens reversos já ajustados · médias anônimas do time.</Text>
+        {scores.length === 0 ? (
+          <SectionMessage title="Sem dados ainda" appearance="information" actions={[]} testId="sm-empty">
+            <Text>Nenhuma resposta registrada. O questionário é enviado automaticamente ao time quando um sprint é encerrado.</Text>
+          </SectionMessage>
+        ) : (
+          <DynamicTable
+            head={PS_REPORT_HEAD}
+            rows={scores.map((s: any) => ({
+              key: `sprint-${s.sprint_number}`,
+              cells: [
+                { key: 'sprint', content: s.sprint_name ?? `Sprint ${s.sprint_number}` },
+                { key: 'responses', content: String(s.response_count) },
+                { key: 'mean', content: s.mean_score.toFixed(2) },
+                { key: 'std', content: s.std_dev.toFixed(2) },
+              ],
+            }))}
+          />
+        )}
+      </Stack>
+    );
+  }
 
   if (sprintState?.status === 'session_expired') {
     return (
