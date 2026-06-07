@@ -7,6 +7,7 @@ import {
   Range as RawRange,
   DynamicTable as RawDynamicTable,
   Lozenge as RawLozenge,
+  Box as RawBox,
   Button,
 } from '@forge/react';
 const Strong = RawStrong as any;
@@ -15,6 +16,7 @@ const SectionMessage = RawSectionMessage as any;
 const Range = RawRange as any;
 const DynamicTable = RawDynamicTable as any;
 const Lozenge = RawLozenge as any;
+const Box = RawBox as any;
 import { invoke } from '@forge/bridge';
 
 const QUESTIONS = [
@@ -206,19 +208,24 @@ export default function RF01PsQuestionnaire() {
       {QUESTIONS.map((question, idx) => {
         const key = `q${idx + 1}`;
         return (
-          <Stack key={key} space="space.100">
-            <Text>{idx + 1}. {question}</Text>
-            <Text>Resposta: <Strong>{answers[key]}</Strong></Text>
-            <Range
-              name={key}
-              min={1}
-              max={5}
-              step={1}
-              value={answers[key]}
-              onChange={(v: number) => setAnswers((prev) => ({ ...prev, [key]: v }))}
-            />
-            <Text>1 — Discordo totalmente &nbsp;·&nbsp; 5 — Concordo totalmente</Text>
-          </Stack>
+          <React.Fragment key={key}>
+            <Stack space="space.100">
+              <Text>{idx + 1}. {question}</Text>
+              <Text>1 — Discordo totalmente &nbsp;·&nbsp; 5 — Concordo totalmente</Text>
+              <Range
+                name={key}
+                min={1}
+                max={5}
+                step={1}
+                value={answers[key]}
+                onChange={(v: number) => setAnswers((prev) => ({ ...prev, [key]: v }))}
+              />
+              <Text>Resposta: <Strong>{answers[key]}</Strong></Text>
+            </Stack>
+            {idx < QUESTIONS.length - 1 && (
+              <Box backgroundColor="color.border" paddingBlock="space.025" />
+            )}
+          </React.Fragment>
         );
       })}
       <Button type="button" onClick={handleSubmit}>Enviar respostas</Button>
