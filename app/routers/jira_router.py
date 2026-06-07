@@ -107,8 +107,6 @@ async def jira_sprint_end(
     team = team_crud.get_team_by_id(db, team_id)
     if not team:
         raise Errors.NOT_FOUND
-    if not team["team_data"].jira_token:
-        raise Errors.NOT_FOUND
 
     try:
         payload = json.loads(body)
