@@ -11,6 +11,7 @@ class Sprint(db.Base):
     team_id = Column(Integer, ForeignKey('team.id'), nullable=False)
     sprint_number = Column(Integer, nullable=False)
     jira_sprint_id = Column(Text, nullable=True)
+    sprint_name = Column(Text, nullable=True)
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
 

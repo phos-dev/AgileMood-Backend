@@ -116,11 +116,13 @@ async def jira_sprint_end(
     if payload.get("webhookEvent") != "jira:sprint_closed":
         return {"message": "Event ignored."}
 
-    jira_sprint_id = str(payload.get("sprint", {}).get("id", ""))
+    sprint_data = payload.get("sprint", {})
+    jira_sprint_id = str(sprint_data.get("id", ""))
+    sprint_name = sprint_data.get("name") or None
     if jira_sprint_id and _is_duplicate_sprint(jira_sprint_id):
         return {"message": "Duplicate event ignored."}
 
-    sprint = questionnaire_crud.create_sprint(db, team_id, jira_sprint_id=jira_sprint_id or None)
+    sprint = questionnaire_crud.create_sprint(db, team_id, jira_sprint_id=jira_sprint_id or None, sprint_name=sprint_name)
     sprint_token = create_sprint_token(team_id, sprint.id)
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     questionnaire_url = f"{frontend_url}/questionnaire/{sprint_token}"

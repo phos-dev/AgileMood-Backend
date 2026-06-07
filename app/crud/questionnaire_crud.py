@@ -15,13 +15,14 @@ def _adjusted_scores(answers: dict) -> list[float]:
     return result
 
 
-def create_sprint(db: Session, team_id: int, jira_sprint_id: str | None = None) -> Sprint:
+def create_sprint(db: Session, team_id: int, jira_sprint_id: str | None = None, sprint_name: str | None = None) -> Sprint:
     next_number = _next_sprint_number(db, team_id)
     now = datetime.datetime.now(datetime.timezone.utc)
     sprint = Sprint(
         team_id=team_id,
         sprint_number=next_number,
         jira_sprint_id=jira_sprint_id,
+        sprint_name=sprint_name,
         start_date=now,
         end_date=now + datetime.timedelta(hours=48),
     )
