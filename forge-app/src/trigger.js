@@ -1,4 +1,4 @@
-import { kvs } from '@forge/kvs';
+import { storage } from '@forge/api';
 import api from '@forge/api';
 
 /**
@@ -12,9 +12,10 @@ export async function handler(event) {
   }
 
   const API_URL = 'https://agilemood-backend-v2.vercel.app';
-  const settings = await kvs.get('agilemood-settings');
-  if (!settings?.jwtToken || !settings?.teamId) {
-    console.log('[AgileMood] Forge trigger not configured. Skipping sprint-end reminder.');
+  const boardId = event.sprint?.originBoardId?.toString() ?? 'default';
+  const settings = await storage.get(`agilemood-board-${boardId}`);
+  if (!settings?.teamId) {
+    console.log('[AgileMood] Forge trigger not configured for project. Skipping sprint-end reminder.');
     return;
   }
 

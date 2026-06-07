@@ -19,7 +19,7 @@ modules:
     - key: agilemood-sprint-end
       function: sprint-end-fn
       events:
-        - avi:jira:updated:sprint
+        - avi:jira-software:closed:sprint
 
   function:
     - key: resolver-fn
@@ -38,6 +38,9 @@ permissions:
     - storage:app
     - read:jira-user
     - read:jira-work
+    - read:sprint:jira-software
+    - read:board-scope:jira-software
+    - read:project:jira
   external:
     fetch:
       backend:

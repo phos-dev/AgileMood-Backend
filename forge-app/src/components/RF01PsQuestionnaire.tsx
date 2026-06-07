@@ -70,6 +70,14 @@ export default function RF01PsQuestionnaire() {
 
   if (!sprintLoaded) return <Text>Carregando questionário...</Text>;
 
+  if (sprintState?.status === 'session_expired') {
+    return (
+      <SectionMessage title="Sessão expirada. Desconecte e reconecte nas Configurações." appearance="error" actions={[]} testId="sm-session">
+        <Text> </Text>
+      </SectionMessage>
+    );
+  }
+
   if (sprintState?.status === 'no_active_sprint') {
     return (
       <SectionMessage title="Nenhum sprint ativo" appearance="information" actions={[]} testId="sm-nosprint">

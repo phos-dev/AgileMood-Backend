@@ -23,10 +23,16 @@ export default function Settings({ onLogin }: SettingsProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [projectStatus, setProjectStatus] = useState<any>(null);
 
   useEffect(() => {
     invoke<any>('getSettings').then((s: any) => {
-      if (s?.jwtToken) setSettings(s);
+      if (s?.jwtToken) {
+        setSettings(s);
+        if (s.role === 'manager') {
+          invoke<any>('getProjectStatus').then(setProjectStatus);
+        }
+      }
     });
   }, []);
 
@@ -57,6 +63,10 @@ export default function Settings({ onLogin }: SettingsProps) {
         email: data.email,
       };
       await invoke('saveSettings', newSettings);
+      if (data.role === 'manager' && teamId) {
+        await invoke('connectProject', { teamId });
+        setProjectStatus({ connected: true, teamId });
+      }
       setSettings(newSettings);
       setPassword('');
       onLogin?.();
@@ -88,6 +98,21 @@ export default function Settings({ onLogin }: SettingsProps) {
           <SectionMessage title="Equipe não encontrada" appearance="warning" actions={[]} testId="sm-noteam">
             <Text>Verifique sua conta no AgileMood — você precisa estar associado a uma equipe.</Text>
           </SectionMessage>
+        )}
+        {settings.role === 'manager' && projectStatus !== null && (
+          projectStatus.connected
+            ? <SectionMessage title="Integração Jira ativa" appearance="confirmation" actions={[]} testId="sm-jira-ok">
+                <Text>Sprints detectados automaticamente ao encerrar no Jira.</Text>
+              </SectionMessage>
+            : <Stack space="space.100">
+                <SectionMessage title="Jira não conectado" appearance="warning" actions={[]} testId="sm-jira-warn">
+                  <Text>Conecte este projeto para detectar sprints automaticamente.</Text>
+                </SectionMessage>
+                <Button type="button" onClick={async () => {
+                  await invoke('connectProject', { teamId: settings.teamId });
+                  setProjectStatus({ connected: true, teamId: settings.teamId });
+                }}>Conectar este projeto</Button>
+              </Stack>
         )}
         <Button type="button" onClick={handleDisconnect}>Desconectar</Button>
       </Stack>

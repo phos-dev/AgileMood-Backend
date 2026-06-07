@@ -1,6 +1,6 @@
 import Resolver from '@forge/resolver';
 import { kvs } from '@forge/kvs';
-import api from '@forge/api';
+import api, { route, storage } from '@forge/api';
 
 const API_URL = 'https://agilemood-backend-v2.vercel.app';
 const resolver = new Resolver();
@@ -114,6 +114,7 @@ resolver.define('getSprintToken', async ({ payload }) => {
   const tokenResp = await api.fetch(`${API_URL}/teams/${teamId}/current-sprint-token`, {
     headers: { Authorization: `Bearer ${jwtToken}` },
   });
+  if (tokenResp.status === 401) return { status: 'session_expired' };
   if (tokenResp.status === 404) return { status: 'no_active_sprint' };
   if (!tokenResp.ok) throw new Error(`${tokenResp.status}`);
   const { sprint_token, sprint_number } = await tokenResp.json();
@@ -121,6 +122,7 @@ resolver.define('getSprintToken', async ({ payload }) => {
   const stateResp = await api.fetch(`${API_URL}/questionnaire/${sprint_token}`, {
     headers: { Authorization: `Bearer ${jwtToken}` },
   });
+  if (stateResp.status === 401) return { status: 'session_expired' };
   if (stateResp.status === 410) return { status: 'expired', sprint_token, sprint_number };
   if (!stateResp.ok) throw new Error(`state: ${stateResp.status}`);
   const state = await stateResp.json();
@@ -145,6 +147,43 @@ resolver.define('getPsReport', async ({ payload }) => {
   });
   if (!resp.ok) throw new Error(`${resp.status}`);
   return await resp.json();
+});
+
+async function _getBoardId(projectId) {
+  try {
+    const resp = await api.asApp().requestJira(route`/rest/agile/1.0/board?projectKeyOrId=${projectId}`);
+    console.log('[AgileMood] _getBoardId status:', resp.status, 'projectId:', projectId);
+    if (resp.ok) {
+      const data = await resp.json();
+      console.log('[AgileMood] boards found:', JSON.stringify(data.values?.map(b => ({ id: b.id, name: b.name }))));
+      const id = data.values?.[0]?.id;
+      if (id) return String(id);
+    } else {
+      console.error('[AgileMood] _getBoardId error:', resp.status);
+    }
+  } catch (e) {
+    console.error('[AgileMood] _getBoardId exception:', e.message);
+  }
+  return null;
+}
+
+resolver.define('connectProject', async ({ payload, context }) => {
+  const { teamId } = payload;
+  const projectId = context.extension?.project?.id;
+  console.log('[AgileMood] connectProject projectId:', projectId, 'teamId:', teamId);
+  const boardId = await _getBoardId(projectId);
+  console.log('[AgileMood] connectProject saving boardId:', boardId);
+  if (!boardId) return { success: false, error: 'board_not_found' };
+  await storage.set(`agilemood-board-${boardId}`, { teamId });
+  return { success: true, boardId };
+});
+
+resolver.define('getProjectStatus', async ({ context }) => {
+  const projectId = context.extension?.project?.id;
+  const boardId = await _getBoardId(projectId);
+  if (!boardId) return { connected: false, teamId: null };
+  const s = await storage.get(`agilemood-board-${boardId}`);
+  return { connected: !!(s?.teamId), teamId: s?.teamId ?? null };
 });
 
 export const handler = resolver.getDefinitions();

@@ -29,13 +29,13 @@ const App = () => {
         {role === 'manager' && <Tab>Dashboard - Humor da Equipe</Tab>}
         {role === 'employee' && <Tab>Registrar Sentimento</Tab>}
         {role === 'employee' && <Tab>Mensagens Recebidas</Tab>}
-        <Tab>Segurança Psicológica</Tab>
+        {settings?.jwtToken && <Tab>Segurança Psicológica</Tab>}
         <Tab>Configurações</Tab>
       </TabList>
       {role === 'manager' && <TabPanel><RF03Dashboard /></TabPanel>}
       {role === 'employee' && <TabPanel><RF06RegisterFeeling /></TabPanel>}
       {role === 'employee' && <TabPanel><RF07Messages /></TabPanel>}
-      <TabPanel><RF01PsQuestionnaire /></TabPanel>
+      {settings?.jwtToken && <TabPanel><RF01PsQuestionnaire /></TabPanel>}
       <TabPanel><Settings onLogin={reload} /></TabPanel>
     </Tabs>
   );
