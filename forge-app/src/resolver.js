@@ -117,16 +117,16 @@ resolver.define('getSprintToken', async ({ payload }) => {
   if (tokenResp.status === 401) return { status: 'session_expired' };
   if (tokenResp.status === 404) return { status: 'no_active_sprint' };
   if (!tokenResp.ok) throw new Error(`${tokenResp.status}`);
-  const { sprint_token, sprint_number } = await tokenResp.json();
+  const { sprint_token, sprint_number, sprint_name } = await tokenResp.json();
 
   const stateResp = await api.fetch(`${API_URL}/questionnaire/${sprint_token}`, {
     headers: { Authorization: `Bearer ${jwtToken}` },
   });
   if (stateResp.status === 401) return { status: 'session_expired' };
-  if (stateResp.status === 410) return { status: 'expired', sprint_token, sprint_number };
+  if (stateResp.status === 410) return { status: 'expired', sprint_token, sprint_number, sprint_name };
   if (!stateResp.ok) throw new Error(`state: ${stateResp.status}`);
   const state = await stateResp.json();
-  return { ...state, sprint_token, sprint_number };
+  return { ...state, sprint_token, sprint_number, sprint_name };
 });
 
 resolver.define('submitPsQuestionnaire', async ({ payload }) => {

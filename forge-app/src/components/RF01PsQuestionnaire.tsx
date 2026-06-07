@@ -131,7 +131,7 @@ export default function RF01PsQuestionnaire() {
 
   return (
     <Stack space="space.200">
-      <Text><Strong>Questionário de Segurança Psicológica — Sprint {sprintState?.sprint_number}</Strong></Text>
+      <Text><Strong>Questionário de Segurança Psicológica — {sprintState?.sprint_name ?? `Sprint ${sprintState?.sprint_number}`}</Strong></Text>
       <Text>{SCALE_LABEL}</Text>
       <SectionMessage title="Respostas anônimas" appearance="information" actions={[]} testId="sm-anon">
         <Text>Suas respostas não são associadas ao seu nome. O gestor vê apenas médias do time.</Text>

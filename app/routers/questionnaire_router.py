@@ -94,4 +94,4 @@ def get_current_sprint_token(
         raise HTTPException(status_code=404, detail="Nenhum sprint ativo para este time.")
 
     token = create_sprint_token(team_id, sprint.id)
-    return CurrentSprintTokenResponse(sprint_token=token, sprint_number=sprint.sprint_number)
+    return CurrentSprintTokenResponse(sprint_token=token, sprint_number=sprint.sprint_number, sprint_name=sprint.sprint_name)

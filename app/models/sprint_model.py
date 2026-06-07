@@ -17,6 +17,7 @@ class QuestionnaireState(BaseModel):
 class CurrentSprintTokenResponse(BaseModel):
     sprint_token: str
     sprint_number: int
+    sprint_name: str | None = None
 
 
 class PSScoreEntry(BaseModel):
