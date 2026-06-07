@@ -14,6 +14,7 @@ class Sprint(db.Base):
     sprint_name = Column(Text, nullable=True)
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
+    questionnaire_expires_at = Column(DateTime, nullable=True)
 
     __table_args__ = (UniqueConstraint('team_id', 'sprint_number', name='uq_sprint_team_number'),)
 

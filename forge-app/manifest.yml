@@ -16,6 +16,10 @@ modules:
         function: resolver-fn
 
   trigger:
+    - key: agilemood-sprint-start
+      function: sprint-start-fn
+      events:
+        - avi:jira-software:started:sprint
     - key: agilemood-sprint-end
       function: sprint-end-fn
       events:
@@ -24,6 +28,8 @@ modules:
   function:
     - key: resolver-fn
       handler: resolver.handler
+    - key: sprint-start-fn
+      handler: triggerStart.handler
     - key: sprint-end-fn
       handler: trigger.handler
 

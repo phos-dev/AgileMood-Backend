@@ -19,9 +19,17 @@ export async function handler(event) {
     return;
   }
 
+  const sprintId = sprint.id?.toString();
+  const startRecord = sprintId ? await storage.get(`agilemood-sprint-${sprintId}-start`) : null;
+
   const body = JSON.stringify({
     webhookEvent: 'jira:sprint_closed',
-    sprint: { id: sprint.id, name: sprint.name, state: sprint.state },
+    sprint: {
+      id: sprint.id,
+      name: sprint.name,
+      state: sprint.state,
+      startDate: startRecord?.startDate ?? sprint.startDate ?? null,
+    },
   });
 
   const headers = { 'Content-Type': 'application/json' };

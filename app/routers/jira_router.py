@@ -119,10 +119,24 @@ async def jira_sprint_end(
     sprint_data = payload.get("sprint", {})
     jira_sprint_id = str(sprint_data.get("id", ""))
     sprint_name = sprint_data.get("name") or None
+    raw_start = sprint_data.get("startDate")
     if jira_sprint_id and _is_duplicate_sprint(jira_sprint_id):
         return {"message": "Duplicate event ignored."}
 
-    sprint = questionnaire_crud.create_sprint(db, team_id, jira_sprint_id=jira_sprint_id or None, sprint_name=sprint_name)
+    start_date = None
+    if raw_start:
+        try:
+            from datetime import datetime
+            start_date = datetime.fromisoformat(raw_start.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            pass
+
+    sprint = questionnaire_crud.create_sprint(
+        db, team_id,
+        jira_sprint_id=jira_sprint_id or None,
+        sprint_name=sprint_name,
+        start_date=start_date,
+    )
     sprint_token = create_sprint_token(team_id, sprint.id)
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     questionnaire_url = f"{frontend_url}/questionnaire/{sprint_token}"

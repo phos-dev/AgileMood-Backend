@@ -15,7 +15,13 @@ def _adjusted_scores(answers: dict) -> list[float]:
     return result
 
 
-def create_sprint(db: Session, team_id: int, jira_sprint_id: str | None = None, sprint_name: str | None = None) -> Sprint:
+def create_sprint(
+    db: Session,
+    team_id: int,
+    jira_sprint_id: str | None = None,
+    sprint_name: str | None = None,
+    start_date: datetime.datetime | None = None,
+) -> Sprint:
     next_number = _next_sprint_number(db, team_id)
     now = datetime.datetime.now(datetime.timezone.utc)
     sprint = Sprint(
@@ -23,8 +29,9 @@ def create_sprint(db: Session, team_id: int, jira_sprint_id: str | None = None, 
         sprint_number=next_number,
         jira_sprint_id=jira_sprint_id,
         sprint_name=sprint_name,
-        start_date=now,
-        end_date=now + datetime.timedelta(hours=48),
+        start_date=start_date,
+        end_date=now,
+        questionnaire_expires_at=now + datetime.timedelta(hours=48),
     )
     db.add(sprint)
     db.commit()
@@ -46,7 +53,7 @@ def get_active_sprint(db: Session, team_id: int) -> Sprint | None:
     now = datetime.datetime.now(datetime.timezone.utc)
     return (
         db.query(Sprint)
-        .filter(Sprint.team_id == team_id, Sprint.end_date > now)
+        .filter(Sprint.team_id == team_id, Sprint.questionnaire_expires_at > now)
         .order_by(Sprint.sprint_number.desc())
         .first()
     )
