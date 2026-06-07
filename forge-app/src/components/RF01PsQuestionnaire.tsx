@@ -27,7 +27,6 @@ const QUESTIONS = [
   'Minhas habilidades únicas e talentos são valorizados e utilizados neste time.',
 ];
 
-const SCALE_LABEL = '1 = Discordo totalmente · 5 = Concordo totalmente';
 
 const PS_REPORT_HEAD = {
   cells: [
@@ -196,7 +195,6 @@ export default function RF01PsQuestionnaire() {
   return (
     <Stack space="space.200">
       <Text><Strong>Questionário de Segurança Psicológica — {sprintState?.sprint_name ?? `Sprint ${sprintState?.sprint_number}`}</Strong></Text>
-      <Text>{SCALE_LABEL}</Text>
       <SectionMessage title="Respostas anônimas" appearance="information" actions={[]} testId="sm-anon">
         <Text>Suas respostas não são associadas ao seu nome. O gestor vê apenas médias do time.</Text>
       </SectionMessage>
@@ -210,7 +208,6 @@ export default function RF01PsQuestionnaire() {
         return (
           <Stack key={key} space="space.100">
             <Text>{idx + 1}. {question}</Text>
-            <Text>Resposta: <Strong>{answers[key]}</Strong></Text>
             <Range
               name={key}
               min={1}
@@ -219,6 +216,7 @@ export default function RF01PsQuestionnaire() {
               value={answers[key]}
               onChange={(v: number) => setAnswers((prev) => ({ ...prev, [key]: v }))}
             />
+            <Text>1 — Discordo totalmente &nbsp;·&nbsp; <Strong>{answers[key]}</Strong> selecionado &nbsp;·&nbsp; 5 — Concordo totalmente</Text>
           </Stack>
         );
       })}
