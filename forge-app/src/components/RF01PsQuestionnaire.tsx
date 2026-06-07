@@ -6,6 +6,7 @@ import {
   SectionMessage as RawSectionMessage,
   Range as RawRange,
   DynamicTable as RawDynamicTable,
+  Lozenge as RawLozenge,
   Button,
 } from '@forge/react';
 const Strong = RawStrong as any;
@@ -13,6 +14,7 @@ const Stack = RawStack as any;
 const SectionMessage = RawSectionMessage as any;
 const Range = RawRange as any;
 const DynamicTable = RawDynamicTable as any;
+const Lozenge = RawLozenge as any;
 import { invoke } from '@forge/bridge';
 
 const QUESTIONS = [
@@ -32,9 +34,16 @@ const PS_REPORT_HEAD = {
     { key: 'sprint', content: 'Sprint' },
     { key: 'responses', content: 'Respostas' },
     { key: 'mean', content: 'Média (1–5)' },
+    { key: 'status', content: 'Status' },
     { key: 'std', content: 'Desvio padrão' },
   ],
 };
+
+function psLozenge(mean: number) {
+  if (mean >= 4) return <Lozenge appearance="success">Bom</Lozenge>;
+  if (mean >= 3) return <Lozenge appearance="moved">Moderado</Lozenge>;
+  return <Lozenge appearance="removed">Atenção</Lozenge>;
+}
 
 export default function RF01PsQuestionnaire() {
   const [settings, setSettings] = useState<any>(null);
@@ -105,6 +114,7 @@ export default function RF01PsQuestionnaire() {
                 { key: 'sprint', content: s.sprint_name ?? `Sprint ${s.sprint_number}` },
                 { key: 'responses', content: String(s.response_count) },
                 { key: 'mean', content: s.mean_score.toFixed(2) },
+                { key: 'status', content: psLozenge(s.mean_score) },
                 { key: 'std', content: s.std_dev.toFixed(2) },
               ],
             }))}
