@@ -102,12 +102,9 @@ def get_ps_scores(db: Session, team_id: int) -> list[dict]:
         user_means = [sum(user_scores) / len(user_scores) for user_scores in all_scores]
         count = len(responses)
         mean = sum(user_means) / len(user_means)
-        variance = sum((s - mean) ** 2 for s in user_means) / len(user_means)
-        std_dev = variance ** 0.5
         result.append({
             "sprint_number": sprint.sprint_number,
             "response_count": count,
             "mean_score": round(mean, 4),
-            "std_dev": round(std_dev, 4),
         })
     return result

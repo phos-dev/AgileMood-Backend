@@ -24,7 +24,6 @@ class PSScoreEntry(BaseModel):
     sprint_number: int
     response_count: int
     mean_score: float
-    std_dev: float
 
 
 class PSReportResponse(BaseModel):

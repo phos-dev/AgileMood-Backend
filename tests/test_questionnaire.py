@@ -222,8 +222,6 @@ class TestScoreCalculation:
 
         user_means = [sum(adj1) / len(adj1), sum(adj2) / len(adj2)]
         expected_mean = sum(user_means) / len(user_means)
-        expected_variance = sum((s - expected_mean) ** 2 for s in user_means) / len(user_means)
-        expected_std = expected_variance ** 0.5
 
         fake_sprint = MagicMock(id=10, sprint_number=1, team_id=1)
         fake_r1 = MagicMock(answers=answers1)
@@ -239,10 +237,9 @@ class TestScoreCalculation:
         assert r["sprint_number"] == 1
         assert r["response_count"] == 2
         assert abs(r["mean_score"] - round(expected_mean, 4)) < 0.001
-        assert abs(r["std_dev"] - round(expected_std, 4)) < 0.001
 
     def test_psychological_safety_report_endpoint(self):
-        fake_scores = [{"sprint_number": 1, "response_count": 3, "mean_score": 3.5, "std_dev": 0.8}]
+        fake_scores = [{"sprint_number": 1, "response_count": 3, "mean_score": 3.5}]
         with patch("app.crud.user_crud.get_user_by_email", return_value=manager_user), \
              patch("app.routers.reports_router.questionnaire_crud.get_ps_scores", return_value=fake_scores):
             resp = client.get(

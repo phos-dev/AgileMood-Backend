@@ -36,7 +36,6 @@ const PS_REPORT_HEAD = {
     { key: 'responses', content: 'Respostas' },
     { key: 'mean', content: 'Média (1–5)' },
     { key: 'status', content: 'Status' },
-    { key: 'std', content: 'Desvio padrão' },
   ],
 };
 
@@ -116,7 +115,6 @@ export default function RF01PsQuestionnaire() {
                 { key: 'responses', content: String(s.response_count) },
                 { key: 'mean', content: s.mean_score.toFixed(2) },
                 { key: 'status', content: psLozenge(s.mean_score) },
-                { key: 'std', content: s.std_dev.toFixed(2) },
               ],
             }))}
           />
@@ -127,7 +125,6 @@ export default function RF01PsQuestionnaire() {
             <Text>Média ≥ 4 — time saudável, alto índice de segurança psicológica.</Text>
             <Text>Média entre 3 e 4 — nível moderado. Monitore a tendência nos próximos sprints.</Text>
             <Text>Média &lt; 3 — sinal de alerta. O time pode não se sentir seguro para arriscar, discordar ou pedir ajuda. Considere uma retrospectiva focada em segurança psicológica.</Text>
-            <Text>Desvio padrão &gt; 1 — o time está dividido: alguns se sentem seguros, outros não. Pode indicar subgrupos ou relações específicas problemáticas.</Text>
             <Text>Tendência entre sprints — média subindo indica que intervenções estão funcionando; média caindo indica que algo aconteceu no time.</Text>
           </Stack>
         )}
