@@ -178,6 +178,16 @@ resolver.define('connectProject', async ({ payload, context }) => {
   return { success: true, boardId };
 });
 
+resolver.define('disconnectJira', async ({ payload }) => {
+  const { teamId, jwtToken } = payload;
+  const resp = await api.fetch(`${API_URL}/integrations/jira/disconnect?team_id=${teamId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${jwtToken}` },
+  });
+  if (!resp.ok) throw new Error(`${resp.status}`);
+  return { success: true };
+});
+
 resolver.define('getProjectStatus', async ({ context }) => {
   const projectId = context.extension?.project?.id;
   const boardId = await _getBoardId(projectId);

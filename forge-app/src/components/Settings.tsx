@@ -103,9 +103,18 @@ export default function Settings({ onLogin }: SettingsProps) {
         )}
         {settings.role === 'manager' && projectStatus !== null && (
           projectStatus.connected
-            ? <SectionMessage title="Integração Jira ativa" appearance="confirmation" actions={[]} testId="sm-jira-ok">
-                <Text>Sprints detectados automaticamente ao encerrar no Jira.</Text>
-              </SectionMessage>
+            ? <Stack space="space.100">
+                <SectionMessage title="Integração Jira ativa" appearance="confirmation" actions={[]} testId="sm-jira-ok">
+                  <Text>Sprints detectados automaticamente ao encerrar no Jira.</Text>
+                </SectionMessage>
+                <SectionMessage title="Desconectar integração" appearance="warning" actions={[]} testId="sm-jira-disconnect-info">
+                  <Text>Ao desconectar, sprints futuros não serão mais detectados automaticamente e o questionário de Segurança Psicológica não será acionado. Os dados históricos já registados são preservados.</Text>
+                </SectionMessage>
+                <Button type="button" onClick={async () => {
+                  await invoke('disconnectJira', { teamId: settings.teamId, jwtToken: settings.jwtToken });
+                  setProjectStatus({ connected: false, teamId: null });
+                }}>Desconectar integração Jira</Button>
+              </Stack>
             : <Stack space="space.100">
                 <SectionMessage title="Jira não conectado" appearance="warning" actions={[]} testId="sm-jira-warn">
                   <Text>Conecte este projeto para detectar sprints automaticamente.</Text>

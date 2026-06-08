@@ -89,10 +89,9 @@ Ao **fechar uma sprint** no Jira (botão "Concluir sprint"), o AgileMood detecta
 
 ### Desconectar a integração
 
-```bash
-curl -X DELETE "https://SEU_BACKEND/integrations/jira/disconnect?team_id=SEU_TEAM_ID" \
-  -H "Authorization: Bearer SEU_JWT"
-```
+Na aba **Configurações** do painel AgileMood, clique em **Desconectar integração Jira**.
+
+> **Atenção:** após a desconexão, sprints futuros não serão mais detectados automaticamente e o questionário de Segurança Psicológica não será acionado. Os dados históricos já registados são preservados. Para reativar, faça login novamente como gestor na aba Configurações.
 
 ---
 
