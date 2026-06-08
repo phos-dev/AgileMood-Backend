@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ForgeReconciler, { Text, Tabs, Tab, TabList, TabPanel } from '@forge/react';
+import ForgeReconciler, { Text, Tabs, Tab, TabList, TabPanel, Box } from '@forge/react';
 import { invoke } from '@forge/bridge';
 import RF01PsQuestionnaire from './components/RF01PsQuestionnaire';
 import RF03Dashboard from './components/RF03Dashboard';
@@ -32,11 +32,44 @@ const App = () => {
         {settings?.jwtToken && <Tab>Segurança Psicológica</Tab>}
         <Tab>Configurações</Tab>
       </TabList>
-      {role === 'manager' && <TabPanel><RF03Dashboard /></TabPanel>}
-      {role === 'employee' && <TabPanel><RF06RegisterFeeling /></TabPanel>}
-      {role === 'employee' && <TabPanel><RF07Messages /></TabPanel>}
-      {settings?.jwtToken && <TabPanel><RF01PsQuestionnaire /></TabPanel>}
-      <TabPanel><Settings onLogin={reload} /></TabPanel>
+      
+      {role === 'manager' && (
+        <TabPanel>
+          <Box paddingBlockStart="space.200">
+            <RF03Dashboard />
+          </Box>
+        </TabPanel>
+      )}
+      
+      {role === 'employee' && (
+        <TabPanel>
+          <Box paddingBlockStart="space.200">
+            <RF06RegisterFeeling />
+          </Box>
+        </TabPanel>
+      )}
+      
+      {role === 'employee' && (
+        <TabPanel>
+          <Box paddingBlockStart="space.200">
+            <RF07Messages />
+          </Box>
+        </TabPanel>
+      )}
+      
+      {settings?.jwtToken && (
+        <TabPanel>
+          <Box paddingBlockStart="space.200">
+            <RF01PsQuestionnaire />
+          </Box>
+        </TabPanel>
+      )}
+      
+      <TabPanel>
+        <Box paddingBlockStart="space.200">
+          <Settings onLogin={reload} />
+        </Box>
+      </TabPanel>
     </Tabs>
   );
 };

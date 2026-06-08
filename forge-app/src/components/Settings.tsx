@@ -6,11 +6,13 @@ import {
   SectionMessage as RawSectionMessage,
   Textfield as RawTextfield,
   Button,
+  Form as RawForm,
 } from '@forge/react';
 const Strong = RawStrong as any;
 const Stack = RawStack as any;
 const SectionMessage = RawSectionMessage as any;
 const Textfield = RawTextfield as any;
+const Form = RawForm as any;
 import { invoke } from '@forge/bridge';
 
 interface SettingsProps {
@@ -120,26 +122,28 @@ export default function Settings({ onLogin }: SettingsProps) {
   }
 
   return (
-    <Stack space="space.200">
-      <Textfield
-        name="email"
-        placeholder="E-mail"
-        value={email}
-        onChange={(e: any) => setEmail(e.target?.value ?? e)}
-      />
-      <Textfield
-        name="password"
-        type="password"
-        placeholder="Senha"
-        value={password}
-        onChange={(e: any) => setPassword(e.target?.value ?? e)}
-      />
-      {error && (
-        <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
-          <Text> </Text>
-        </SectionMessage>
-      )}
-      <Button type="button" onClick={handleLogin}>{loading ? 'Conectando...' : 'Entrar'}</Button>
-    </Stack>
+    <Form onSubmit={handleLogin}>
+      <Stack space="space.200">
+        <Textfield
+          name="email"
+          placeholder="E-mail"
+          value={email}
+          onChange={(e: any) => setEmail(e.target?.value ?? e)}
+        />
+        <Textfield
+          name="password"
+          type="password"
+          placeholder="Senha"
+          value={password}
+          onChange={(e: any) => setPassword(e.target?.value ?? e)}
+        />
+        {error && (
+          <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err">
+            <Text> </Text>
+          </SectionMessage>
+        )}
+        <Button type="submit">{loading ? 'Conectando...' : 'Entrar'}</Button>
+      </Stack>
+    </Form>
   );
 }
