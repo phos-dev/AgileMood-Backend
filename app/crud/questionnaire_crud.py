@@ -1,5 +1,4 @@
 import datetime
-import math
 from sqlalchemy.orm import Session
 
 from app.schemas.sprint_schema import Sprint, PSResponse, PSDeduplication
@@ -100,11 +99,11 @@ def get_ps_scores(db: Session, team_id: int) -> list[dict]:
         if not responses:
             continue
         all_scores = [_adjusted_scores(r.answers) for r in responses]
-        flat = [score for row in all_scores for score in row]
+        user_means = [sum(user_scores) / len(user_scores) for user_scores in all_scores]
         count = len(responses)
-        mean = sum(flat) / len(flat)
-        variance = sum((x - mean) ** 2 for x in flat) / len(flat)
-        std_dev = math.sqrt(variance)
+        mean = sum(user_means) / len(user_means)
+        variance = sum((s - mean) ** 2 for s in user_means) / len(user_means)
+        std_dev = variance ** 0.5
         result.append({
             "sprint_number": sprint.sprint_number,
             "response_count": count,

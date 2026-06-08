@@ -1,5 +1,4 @@
 """Questionnaire (RF01) tests — mock-based, following project test pattern."""
-import math
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -221,10 +220,10 @@ class TestScoreCalculation:
         assert _adjusted_scores(answers1) == adj1
         assert _adjusted_scores(answers2) == adj2
 
-        flat = adj1 + adj2
-        expected_mean = sum(flat) / len(flat)
-        expected_variance = sum((x - expected_mean) ** 2 for x in flat) / len(flat)
-        expected_std = math.sqrt(expected_variance)
+        user_means = [sum(adj1) / len(adj1), sum(adj2) / len(adj2)]
+        expected_mean = sum(user_means) / len(user_means)
+        expected_variance = sum((s - expected_mean) ** 2 for s in user_means) / len(user_means)
+        expected_std = expected_variance ** 0.5
 
         fake_sprint = MagicMock(id=10, sprint_number=1, team_id=1)
         fake_r1 = MagicMock(answers=answers1)

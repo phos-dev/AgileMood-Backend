@@ -25,7 +25,7 @@ const QUESTIONS = [
   'As pessoas neste time às vezes rejeitam outras por serem diferentes.',
   'É seguro arriscar neste time.',
   'É difícil pedir ajuda a outros membros deste time.',
-  'Nenhum membro deste time agiria de forma a prejudicar deliberadamente os esforços dos outros.',
+  'Nenhum membro deste time agiria de forma a prejudicar deliberadamente os meus esforços.',
   'Minhas habilidades únicas e talentos são valorizados e utilizados neste time.',
 ];
 
