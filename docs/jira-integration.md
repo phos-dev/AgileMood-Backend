@@ -69,7 +69,7 @@ O app autentica automaticamente e associa a equipe à sua conta. **O projeto Jir
 
 **RF01 — Segurança Psicológica**
 1. No board do Jira → clique em **Dashboard AgileMood** → aba **Segurança Psicológica**
-2. **Gestor:** vê o relatório histórico por sprint (média, desvio padrão, status semáforo). O gestor não responde o questionário.
+2. **Gestor:** vê o relatório histórico por sprint (média, status semáforo). O gestor não responde o questionário.
 3. **Membros:** veem o formulário de 7 perguntas com escala Likert 1–5. Disponível por 48h após o encerramento de cada sprint. Respostas são anônimas.
 
 ---
@@ -197,7 +197,7 @@ Manager views report:
         │
         │  GET /reports/psychological-safety?team_id=X
         ▼
-Per-sprint: response_count, mean_score (reverse-scored items 1,3,5), std_dev
+Per-sprint: response_count, mean_score (reverse-scored items 1,3,5)
 ```
 
 Forge App panel flow:
@@ -231,7 +231,7 @@ AgileMood Backend API
 | `GET` | `/teams/{team_id}/current-sprint-token` | Member/Manager JWT | Returns sprint_token + sprint_name if questionnaire window is open |
 | `GET` | `/questionnaire/{sprint_token}` | Member JWT | Returns questionnaire state: pending / answered / expired |
 | `POST` | `/questionnaire/submit` | Member JWT | Submit 7-item answers (stored anonymously, dedup by user+sprint) |
-| `GET` | `/reports/psychological-safety?team_id=X` | Manager JWT | Per-sprint mean + std_dev (Edmondson reverse-scored) |
+| `GET` | `/reports/psychological-safety?team_id=X` | Manager JWT | Per-sprint mean score (Edmondson reverse-scored, per-user means) |
 
 ---
 
@@ -254,7 +254,7 @@ AgileMood Backend API
 
 ### Score Calculation (Edmondson Scale)
 
-Items 1, 3, and 5 are reverse-scored: `adjusted = 6 - raw`. All other items use the raw value. The team mean is the average of all adjusted scores across all respondents for a given sprint.
+Items 1, 3, and 5 are reverse-scored: `adjusted = 6 - raw`. All other items use the raw value. Each respondent's 7 adjusted scores are averaged into a per-user mean. The team score is the mean of those per-user means.
 
 ```python
 REVERSE_ITEMS = {1, 3, 5}  # 1-indexed question numbers
