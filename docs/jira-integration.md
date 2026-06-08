@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-O App AgileMood para Jira incorpora funcionalidades de monitoramento de humor diretamente nos boards e issues do Jira. Os membros da equipe podem registrar sentimentos de forma anônima sem sair do Jira, e o gestor pode visualizar o dashboard e receber lembretes automáticos ao fim de cada sprint.
+O App AgileMood para Jira incorpora funcionalidades de monitoramento de humor diretamente nos boards e issues do Jira. Os membros da equipe podem registrar sentimentos de forma anônima sem sair do Jira, e o gestor pode visualizar o dashboard e relatórios de segurança psicológica.
 
 **Privacidade:** todos os registros enviados pelo app têm `is_anonymous=True` forçado — o gestor não consegue identificar quem submeteu o quê.
 
@@ -13,7 +13,7 @@ O App AgileMood para Jira incorpora funcionalidades de monitoramento de humor di
 | Registrar Sentimento | RF06 — registrar emoção de forma anônima | Membros |
 | Mensagens Recebidas | RF07 — visualizar feedbacks recebidos (só leitura) | Membros |
 | Dashboard AgileMood | RF03 — gráficos de humor e nível de alerta | Gestor |
-| Gatilho de fim de sprint | RF01 — lembretes Slack automáticos ao fechar sprint | Automático |
+| Segurança Psicológica | RF01 — questionário anônimo de 7 itens (Edmondson), disponível 48h após o sprint; relatório histórico | Membros / Gestor |
 
 ---
 
@@ -25,7 +25,7 @@ O App AgileMood para Jira incorpora funcionalidades de monitoramento de humor di
 
 - Conta AgileMood com perfil de **Gestor**
 - Acesso de administrador ao site Jira
-- Integração com Slack já configurada na equipe (necessária para os lembretes RF01)
+- Integração com Slack e/ou Microsoft Teams já configurada na equipe (necessária para os lembretes RF01)
 
 ---
 
@@ -39,12 +39,12 @@ O App AgileMood para Jira incorpora funcionalidades de monitoramento de humor di
 
 ### Passo 2 — Configurar o App
 
-1. No Jira, acesse o board do seu projecto
+1. No Jira, acesse o board do seu projeto
 2. No cabeçalho → clique em **AgileMood** → aba **Configurações**
 3. Introduza o seu **e-mail** e **password** do AgileMood
 4. Clique em **Entrar**
 
-O app autentica automaticamente e associa a equipa à sua conta. Não é necessário copiar tokens ou IDs manualmente.
+O app autentica automaticamente e associa a equipe à sua conta. **O projeto Jira é conectado automaticamente ao board** — não é necessário copiar tokens ou IDs manualmente. Um indicador verde ("Integração Jira ativa") confirma a conexão.
 
 > **Sessão:** O token expira após 4 horas. Se aparecer erro de "Sessão expirada", clique em **Desconectar** e faça login novamente.
 
@@ -67,13 +67,23 @@ O app autentica automaticamente e associa a equipa à sua conta. Não é necess�
 2. Selecione o período e clique em **Carregar**
 3. Visualize distribuição de emoções, intensidade média e nível de alerta
 
+**RF01 — Segurança Psicológica**
+1. No board do Jira → clique em **Dashboard AgileMood** → aba **Segurança Psicológica**
+2. **Gestor:** vê o relatório histórico por sprint (média, desvio padrão, status semáforo). O gestor não responde o questionário.
+3. **Membros:** veem o formulário de 7 perguntas com escala Likert 1–5. Disponível por 48h após o encerramento de cada sprint. Respostas são anônimas.
+
 ---
 
-### Passo 4 — Gatilho automático de fim de sprint (RF01)
+### Passo 4 — Fluxo automático de fim de sprint (RF01)
 
-Ao **fechar uma sprint** no Jira (botão "Concluir sprint"), o AgileMood detecta automaticamente o evento e envia lembretes Slack (RF01) para todos os membros da equipe solicitando o preenchimento do Questionário Anônimo Periódico.
+Ao **fechar uma sprint** no Jira (botão "Concluir sprint"), o AgileMood detecta o evento automaticamente e executa o seguinte fluxo:
 
-> **Por que automático?** Ao contrário do Trello (que exige um card sentinela), o Jira possui um evento nativo de encerramento de sprint. Nenhuma configuração adicional é necessária — basta ter o Webhook Secret configurado (Passo 4).
+1. Cria um registro de sprint na base de dados com a data real de início (capturada no momento do "Iniciar sprint")
+2. Gera um token de questionário válido por **48 horas**
+3. Envia DMs via **Slack** e **Microsoft Teams** a cada membro da equipe com o link para responder
+4. O formulário também fica acessível diretamente no painel RF01 do Jira durante as 48h
+
+> **Sem configuração adicional** — basta o gestor ter feito login no Passo 2 para que a conexão automática ao board esteja ativa.
 
 ---
 
@@ -91,11 +101,13 @@ curl -X DELETE "https://SEU_BACKEND/integrations/jira/disconnect?team_id=SEU_TEA
 | Problema | Causa | Solução |
 |---------|-------|---------|
 | "AgileMood não configurado" | Configurações não salvas | Abrir Settings e preencher todos os campos |
+| "Integração Jira ativa" não aparece | Gestor não fez login ainda | Fazer login na aba Configurações |
 | 403 em connect/disconnect | Usuário não é gestor da equipe | Apenas o gestor que criou a equipe pode configurar |
-| Webhook retorna 404 | Equipe sem jira_token salvo | Executar POST /integrations/jira/connect primeiro |
 | Sem lembretes Slack | Equipe sem Slack bot token | Configurar `PUT /teams/{id}/slack-bot-token` |
+| Sem lembretes Teams | Equipe sem webhook Teams | Configurar integração Teams na plataforma |
 | JWT expirado | Token válido por 4h | Fazer login novamente e atualizar nas Settings |
 | Painéis não aparecem | App não instalado/recarregado | Desinstalar e reinstalar o app no Jira |
+| Questionário não aparece após sprint | Sprint não gerou token | Verificar logs Forge — gestor precisa ter feito login antes do primeiro sprint |
 
 ---
 
@@ -108,13 +120,29 @@ curl -X DELETE "https://SEU_BACKEND/integrations/jira/disconnect?team_id=SEU_TEA
 | File | Change |
 |------|--------|
 | `migrations/versions/007_add_jira_fields_to_team.py` | Alembic migration: `jira_token` + `jira_cloud_id` columns on `team` table |
+| `migrations/versions/009_add_sprint_and_ps_tables.py` | Tables: `sprint`, `ps_response`, `ps_deduplication` |
+| `migrations/versions/010_add_sprint_name.py` | `sprint_name TEXT` column on `sprint` |
+| `migrations/versions/011_add_questionnaire_expires_at.py` | `questionnaire_expires_at` column; separates questionnaire window from `end_date` |
 | `app/schemas/team_schema.py` | Added `jira_token`, `jira_cloud_id` columns |
+| `app/schemas/sprint_schema.py` | ORM models: `Sprint`, `PSResponse`, `PSDeduplication` |
 | `app/models/team_model.py` | Added fields to `TeamData`; `jira_cloud_id` to `TeamDataSafe`; `JiraConnectRequest` model |
+| `app/models/sprint_model.py` | Pydantic: `PSSubmitRequest`, `QuestionnaireState`, `CurrentSprintTokenResponse`, `PSScoreEntry`, `PSReportResponse` |
 | `app/crud/team_crud.py` | Added `update_jira_credentials(db, team_id, token, cloud_id)` |
-| `app/routers/jira_router.py` | New router: connect, disconnect, sprint-end webhook (POST + HEAD) |
-| `app/main.py` | Registered jira router |
-| `tests/jira_tests.py` | 15 tests covering all endpoints, signature verification, and deduplication |
-| `forge-app/` | Atlassian Forge App (see `forge-app/README.md` for deploy instructions) |
+| `app/crud/questionnaire_crud.py` | `create_sprint`, `get_active_sprint`, `has_answered`, `save_ps_response`, `mark_answered`, `get_ps_scores` (Edmondson reverse-scoring) |
+| `app/routers/jira_router.py` | Connect, disconnect, sprint-end webhook (POST + HEAD); jira_token check removed — auth via HMAC only |
+| `app/routers/questionnaire_router.py` | `GET /questionnaire/{token}`, `POST /questionnaire/submit`, `GET /teams/{id}/current-sprint-token` |
+| `app/routers/reports_router.py` | `GET /reports/psychological-safety` |
+| `app/routers/authentication.py` | `create_sprint_token()`, `decode_sprint_token()` — 48h JWT |
+| `app/main.py` | Registered jira + questionnaire routers |
+| `app/services/slack_service.py` | `send_sprint_end_reminder` updated with questionnaire link |
+| `app/services/teams_service.py` | `send_sprint_end_reminder` — sends Adaptive Card with questionnaire link |
+| `forge-app/manifest.yml` | Two triggers: `avi:jira-software:started:sprint` + `avi:jira-software:closed:sprint` |
+| `forge-app/src/triggerStart.js` | Stores actual sprint `start_date` in Forge storage |
+| `forge-app/src/trigger.js` | Reads stored `start_date`; calls backend webhook with sprint name + dates |
+| `forge-app/src/resolver.js` | `connectProject`, `getProjectStatus`, `getSprintToken`, `submitPsQuestionnaire`, `getPsReport` |
+| `forge-app/src/components/RF01PsQuestionnaire.tsx` | Full questionnaire UI (member) + historical report (manager) |
+| `tests/jira_tests.py` | 15 tests covering connect/disconnect, signature, deduplication |
+| `tests/test_questionnaire.py` | Integration tests: sprint creation, submit, dedup, score calculation |
 | `docs/jira-integration.md` | This document |
 
 ---
@@ -122,39 +150,72 @@ curl -X DELETE "https://SEU_BACKEND/integrations/jira/disconnect?team_id=SEU_TEA
 ### Architecture
 
 ```
+Sprint started in Jira board
+        │
+        │  avi:jira-software:started:sprint
+        ▼
+Forge trigger: forge-app/src/triggerStart.js
+        │
+        │  stores { startDate } keyed by sprint.id in Forge storage
+        ▼
+(waits for sprint close)
+
 Sprint closed in Jira board
         │
-        │  avi:jira:updated:sprint (state=closed)
+        │  avi:jira-software:closed:sprint
         ▼
 Forge trigger: forge-app/src/trigger.js
         │
-        │  reads settings from Forge storage
+        │  reads agilemood-board-${originBoardId} → teamId
+        │  reads agilemood-sprint-${sprintId}-start → startDate
         │  computes HMAC-SHA256(JIRA_WEBHOOK_SECRET, body)
         ▼
 POST /webhooks/jira/sprint-end?team_id=X   (X-Jira-Signature header)
         │
         │  verifies signature, deduplicates by sprint.id (60s TTL)
+        │  creates sprint row (sprint_number, name, start_date, questionnaire_expires_at = now+48h)
+        │  creates sprint_token JWT (exp: 48h)
         │  BackgroundTasks.add_task(...)
         ▼
-send_sprint_end_reminder(team_id)
+send_sprint_end_reminder(team_id, questionnaire_url)
         │
         │  for each team member
         ▼
-Slack DM via send_dm()  →  RF01 reminder to register mood
+Slack DM + Teams DM  →  link to questionnaire (valid 48h)
+
+Member opens link or Jira RF01 panel:
+        │
+        │  GET /teams/{id}/current-sprint-token  (Bearer JWT)
+        │  GET /questionnaire/{sprint_token}
+        ▼
+7-item Likert form (Edmondson scale, 1–5)
+        │
+        │  POST /questionnaire/submit
+        ▼
+ps_response (answers JSON, no user_id) + ps_deduplication (user_id, sprint_id)
+
+Manager views report:
+        │
+        │  GET /reports/psychological-safety?team_id=X
+        ▼
+Per-sprint: response_count, mean_score (reverse-scored items 1,3,5), std_dev
 ```
 
 Forge App panel flow:
 ```
-Jira board/issue (Forge iframe)
+Jira board (Forge iframe)
         │  loads
         ▼
-RF06 / RF07 / RF03 component
-        │  reads settings from Forge storage (apiUrl, jwtToken, teamId)
+RF06 / RF07 / RF03 / RF01 component
+        │  reads settings from Forge KVS (jwtToken, teamId, role)
         │
-        │  RF06: POST /emotion_record/public?team_id=X  (is_anonymous=True forced, no auth)
+        │  RF06: POST /emotion_record/public?team_id=X  (is_anonymous=True forced)
         │  RF07: GET  /feedback/  (Bearer JWT)
         │  RF03: GET  /reports/emoji-distribution/{teamId}
         │          +  /reports/average-intensity/{teamId}
+        │  RF01 (member): GET /teams/{id}/current-sprint-token → GET /questionnaire/{token}
+        │                  POST /questionnaire/submit
+        │  RF01 (manager): GET /reports/psychological-safety?team_id=X
         ▼
 AgileMood Backend API
 ```
@@ -167,7 +228,20 @@ AgileMood Backend API
 |--------|---------|------|-------------|
 | `POST` | `/integrations/jira/connect?team_id=X` | Manager JWT | Save Jira token + cloud ID for team |
 | `DELETE` | `/integrations/jira/disconnect?team_id=X` | Manager JWT | Remove Jira credentials |
-| `POST` / `HEAD` | `/webhooks/jira/sprint-end?team_id=X` | HMAC-SHA256 (optional) | Trigger RF01 Slack reminders on sprint close |
+| `POST` / `HEAD` | `/webhooks/jira/sprint-end?team_id=X` | HMAC-SHA256 (optional) | Create sprint + token, queue questionnaire reminders |
+| `GET` | `/teams/{team_id}/current-sprint-token` | Member/Manager JWT | Returns sprint_token + sprint_name if questionnaire window is open |
+| `GET` | `/questionnaire/{sprint_token}` | Member JWT | Returns questionnaire state: pending / answered / expired |
+| `POST` | `/questionnaire/submit` | Member JWT | Submit 7-item answers (stored anonymously, dedup by user+sprint) |
+| `GET` | `/reports/psychological-safety?team_id=X` | Manager JWT | Per-sprint mean + std_dev (Edmondson reverse-scored) |
+
+---
+
+### Forge Storage Keys
+
+| Key | Set by | Content |
+|-----|--------|---------|
+| `agilemood-board-${boardId}` | `resolver.js → connectProject` (on manager login) | `{ teamId }` |
+| `agilemood-sprint-${sprintId}-start` | `triggerStart.js` (on sprint start) | `{ startDate: ISO string }` |
 
 ---
 
@@ -179,15 +253,36 @@ AgileMood Backend API
 
 ---
 
+### Score Calculation (Edmondson Scale)
+
+Items 1, 3, and 5 are reverse-scored: `adjusted = 6 - raw`. All other items use the raw value. The team mean is the average of all adjusted scores across all respondents for a given sprint.
+
+```python
+REVERSE_ITEMS = {1, 3, 5}  # 1-indexed question numbers
+
+def _adjusted(answers: dict) -> list[float]:
+    return [6 - answers[f"q{i}"] if i in REVERSE_ITEMS else answers[f"q{i}"]
+            for i in range(1, 8)]
+```
+
+Interpretation thresholds (displayed in the manager Lozenge column):
+- **≥ 4.0** → `success` (green) — high psychological safety
+- **3.0–3.9** → `moved` (yellow) — moderate
+- **< 3.0** → `removed` (red) — alert
+
+---
+
 ### Key Differences from Trello Integration
 
 | Aspect | Trello | Jira |
 |--------|--------|------|
-| Sprint trigger | Sentinel card moved to done-list | Native `avi:jira:updated:sprint` event — no card needed |
+| Sprint trigger | Sentinel card moved to done-list | Native `avi:jira-software:closed:sprint` event — no card needed |
+| Start date capture | N/A | `avi:jira-software:started:sprint` stores real start date before close event fires |
 | Webhook signature | HMAC-SHA1 (base64) via `TRELLO_API_SECRET` | HMAC-SHA256 (hex) via `JIRA_WEBHOOK_SECRET` |
 | UI delivery | Power-Up HTML served from `app/static/powerup/` | Forge App deployed to Atlassian cloud via CLI |
-| Manager setup | Trello token + board/webhook registration | Forge settings panel only |
+| Manager setup | Trello token + board/webhook registration | Forge settings panel only — auto-connects on login |
 | Deduplication key | Trello action ID | Jira sprint ID |
+| Questionnaire | Not implemented | RF01 panel in Forge app + DM link (48h window) |
 
 ---
 
@@ -211,7 +306,7 @@ Set `JIRA_WEBHOOK_SECRET` in backend `.env` and enter the same value in the Forg
 Backend webhook (simulate sprint-end event):
 ```bash
 SECRET="your-secret"
-BODY='{"webhookEvent":"jira:sprint_closed","sprint":{"id":1,"name":"Sprint 1","state":"closed"}}'
+BODY='{"webhookEvent":"jira:sprint_closed","sprint":{"id":1,"name":"Sprint 1","state":"closed","startDate":"2026-06-01T09:00:00.000-0300"}}'
 SIG="sha256=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
 
 curl -X POST "http://localhost:8000/webhooks/jira/sprint-end?team_id=1" \
