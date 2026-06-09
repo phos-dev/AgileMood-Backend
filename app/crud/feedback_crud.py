@@ -2,8 +2,8 @@ from sqlalchemy.orm import Session
 
 from app.models.feedback_model import FeedbackCreate, FeedbackResponse
 from app.schemas.feedback_schema import Feedback
-from app.schemas.emotion_record_schema import EmotionRecord
-from app.crud.team_crud import is_manager_of_team
+from app.schemas.emotion_record_schema import EmotionRecord, Emotion
+from app.schemas.team_schema import Team
 
 from app.utils.logger import logger
 
@@ -68,53 +68,17 @@ def get_feedbacks_by_user_id(db: Session, user_id: int):
     return result
 
 
-def can_manager_send_feedback(db: Session, manager_id: int, emotion_record_id: int):
-    """
-    Verifica se o gerente pode enviar feedback para um registro de emoção específico
-    """
-    # Buscar o registro de emoção
+def can_manager_send_feedback(db: Session, manager_id: int, emotion_record_id: int) -> bool:
     emotion_record = db.query(EmotionRecord).filter(EmotionRecord.id == emotion_record_id).first()
     if not emotion_record:
         return False
-    
-    # Se o registro for anônimo, o gerente pode enviar feedback sem saber quem é o colaborador
-    if emotion_record.is_anonymous:
-        # Mas ainda precisamos verificar se o gerente é gerente do time do colaborador
-        # Para isso, precisamos buscar o time do colaborador
-        from app.schemas.user_schema import User
-        from app.schemas.team_schema import Team, user_teams
-        
-        user = db.query(User).filter(User.id == emotion_record.user_id).first()
-        if not user:
-            return False
-        
-        # Buscar os times do usuário
-        teams = db.query(Team).join(user_teams).filter(user_teams.c.user_id == user.id).all()
-        
-        # Verificar se o gerente é gerente de algum dos times
-        for team in teams:
-            if team.manager_id == manager_id:
-                return True
-        
+
+    emotion = db.query(Emotion).filter(Emotion.id == emotion_record.emotion_id).first()
+    if not emotion:
         return False
-    else:
-        # Se o registro não for anônimo, o gerente precisa ser gerente do time do colaborador
-        user_id = emotion_record.user_id
-        
-        # Buscar os times do usuário
-        from app.schemas.user_schema import User
-        from app.schemas.team_schema import Team, user_teams
-        
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return False
-        
-        # Buscar os times do usuário
-        teams = db.query(Team).join(user_teams).filter(user_teams.c.user_id == user.id).all()
-        
-        # Verificar se o gerente é gerente de algum dos times
-        for team in teams:
-            if team.manager_id == manager_id:
-                return True
-        
-        return False 
+
+    team = db.query(Team).filter(Team.id == emotion.team_id).first()
+    if not team:
+        return False
+
+    return team.manager_id == manager_id
