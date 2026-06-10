@@ -54,6 +54,8 @@ def get_feedbacks_by_user_id(db: Session, user_id: int):
         # Se o feedback for anônimo, o gerente não sabe a identidade do colaborador
         manager_knows_identity = not emotion_record.is_anonymous
         
+        emotion = db.query(Emotion).filter(Emotion.id == emotion_record.emotion_id).first()
+
         feedback_response = FeedbackResponse(
             id=feedback.id,
             message=feedback.message,
@@ -61,7 +63,10 @@ def get_feedbacks_by_user_id(db: Session, user_id: int):
             manager_id=feedback.manager_id,
             is_anonymous=feedback.is_anonymous,
             created_at=feedback.created_at,
-            manager_knows_identity=manager_knows_identity
+            manager_knows_identity=manager_knows_identity,
+            emotion_name=emotion.name if emotion else None,
+            emotion_notes=emotion_record.notes,
+            emotion_intensity=emotion_record.intensity,
         )
         result.append(feedback_response)
     

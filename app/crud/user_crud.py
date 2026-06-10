@@ -20,7 +20,9 @@ def get_user_by_email(db: Session, email: str) -> UserInDB | None:
 def get_user_team(db: Session, user_id: int):
     # Try member join table first (employees and managers who are also members)
     team_id = db.execute(
-        select(user_teams.c.team_id).where(user_teams.c.user_id == user_id)
+        select(user_teams.c.team_id)
+        .where(user_teams.c.user_id == user_id)
+        .order_by(user_teams.c.team_id)
     ).scalar()
     if team_id is not None:
         return team_id

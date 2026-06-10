@@ -9,6 +9,7 @@ import {
   Lozenge as RawLozenge,
   Box as RawBox,
   Button,
+  Select as RawSelect,
 } from '@forge/react';
 const Strong = RawStrong as any;
 const Stack = RawStack as any;
@@ -17,6 +18,7 @@ const Range = RawRange as any;
 const DynamicTable = RawDynamicTable as any;
 const Lozenge = RawLozenge as any;
 const Box = RawBox as any;
+const Select = RawSelect as any;
 import { invoke } from '@forge/bridge';
 
 const QUESTIONS = [
@@ -28,7 +30,6 @@ const QUESTIONS = [
   'Nenhum membro deste time agiria de forma a prejudicar deliberadamente os meus esforços.',
   'Minhas habilidades únicas e talentos são valorizados e utilizados neste time.',
 ];
-
 
 const PS_REPORT_HEAD = {
   cells: [
@@ -51,24 +52,66 @@ export default function RF01PsQuestionnaire() {
   const [sprintState, setSprintState] = useState<any>(null);
   const [sprintLoaded, setSprintLoaded] = useState(false);
   const [report, setReport] = useState<any>(null);
+  const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({
     q1: 3, q2: 3, q3: 3, q4: 3, q5: 3, q6: 3, q7: 3,
   });
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadTeamData = (teamId: number, jwtToken: string) => {
+    setSprintLoaded(false);
+    setSubmitted(false);
+    setAnswers({ q1: 3, q2: 3, q3: 3, q4: 3, q5: 3, q6: 3, q7: 3 });
+    setError(null);
+    Promise.all([
+      invoke<any>('getPsReport', { teamId, jwtToken })
+        .catch((e: any) => ({
+          scores: [],
+          error: e?.message?.includes('401') ? 'session_expired' : 'fetch_error',
+        })),
+      invoke<any>('getSprintToken', { teamId, jwtToken })
+        .catch(() => ({ status: 'no_active_sprint' })),
+    ]).then(([r, state]: any[]) => {
+      setReport(r);
+      setSprintState(state);
+      setSprintLoaded(true);
+    });
+  };
+
   useEffect(() => {
-    invoke<any>('getSettings').then((s: any) => {
+    invoke<any>('getSettings').then(async (s: any) => {
       setSettings(s);
       setLoaded(true);
-      if (!s?.jwtToken || !s?.teamId) { setSprintLoaded(true); return; }
+      if (!s?.jwtToken) { setSprintLoaded(true); return; }
+
+      const projectStatus = await invoke<any>('getProjectStatus').catch(() => null);
+      const effectiveTeamId = projectStatus?.teamId ?? s.teamId ?? null;
 
       if (s.role === 'manager') {
-        invoke<any>('getPsReport', { teamId: s.teamId, jwtToken: s.jwtToken })
-          .then((r: any) => { setReport(r); setSprintLoaded(true); })
-          .catch(() => { setReport({ scores: [] }); setSprintLoaded(true); });
+        invoke<any>('getMyTeams', { jwtToken: s.jwtToken })
+          .then((allTeams: { id: number; name: string }[]) => {
+            setTeams(allTeams);
+            const initialId = effectiveTeamId ?? allTeams[0]?.id ?? null;
+            if (initialId) {
+              setSelectedTeamId(initialId);
+              loadTeamData(initialId, s.jwtToken);
+            } else {
+              setSprintLoaded(true);
+            }
+          })
+          .catch(() => {
+            if (effectiveTeamId) {
+              setSelectedTeamId(effectiveTeamId);
+              loadTeamData(effectiveTeamId, s.jwtToken);
+            } else {
+              setSprintLoaded(true);
+            }
+          });
       } else {
-        invoke<any>('getSprintToken', { teamId: s.teamId, jwtToken: s.jwtToken })
+        if (!effectiveTeamId) { setSprintLoaded(true); return; }
+        invoke<any>('getSprintToken', { teamId: effectiveTeamId, jwtToken: s.jwtToken })
           .then((state: any) => { setSprintState(state); setSprintLoaded(true); })
           .catch(() => { setSprintState({ status: 'no_active_sprint' }); setSprintLoaded(true); });
       }
@@ -85,7 +128,7 @@ export default function RF01PsQuestionnaire() {
     );
   }
 
-  if (!settings?.teamId) {
+  if (!settings?.teamId && settings?.role !== 'manager') {
     return (
       <SectionMessage title="Equipe não configurada" appearance="warning" actions={[]} testId="sm-noteam">
         <Text>Sua conta não está associada a uma equipe. Verifique no AgileMood.</Text>
@@ -93,44 +136,130 @@ export default function RF01PsQuestionnaire() {
     );
   }
 
-  if (!sprintLoaded) return <Text>Carregando...</Text>;
+  const handleSubmit = async () => {
+    setError(null);
+    try {
+      await invoke('submitPsQuestionnaire', {
+        jwtToken: settings.jwtToken,
+        sprint_token: sprintState.sprint_token,
+        answers,
+      });
+      setSubmitted(true);
+    } catch (e: any) {
+      if (e.message?.includes('401')) {
+        setError('Sessão expirada. Reconecte nas Configurações.');
+      } else if (e.message?.includes('409')) {
+        setError('Você já respondeu este questionário.');
+      } else {
+        setError(`Erro ao enviar: ${e.message}`);
+      }
+    }
+  };
 
   if (settings.role === 'manager') {
     const scores = report?.scores ?? [];
+    const teamOptions = teams.map(t => ({ label: t.name, value: String(t.id) }));
+    const selectedOption = teamOptions.find(o => o.value === String(selectedTeamId)) ?? null;
+
     return (
       <Stack space="space.200">
-        <Text><Strong>Segurança Psicológica — Histórico por Sprint</Strong></Text>
-        <Text>Pontuação de 1 a 5 · itens reversos já ajustados · médias anônimas do time.</Text>
-        {scores.length === 0 ? (
-          <SectionMessage title="Sem dados ainda" appearance="information" actions={[]} testId="sm-empty">
-            <Text>Nenhuma resposta registrada. O questionário é enviado automaticamente ao time quando um sprint é encerrado.</Text>
-          </SectionMessage>
-        ) : (
-          <DynamicTable
-            head={PS_REPORT_HEAD}
-            rows={scores.map((s: any) => ({
-              key: `sprint-${s.sprint_number}`,
-              cells: [
-                { key: 'sprint', content: s.sprint_name ?? `Sprint ${s.sprint_number}` },
-                { key: 'responses', content: String(s.response_count) },
-                { key: 'mean', content: s.mean_score.toFixed(2) },
-                { key: 'status', content: psLozenge(s.mean_score) },
-              ],
-            }))}
+        {teams.length > 1 && (
+          <Select
+            name="team-select"
+            options={teamOptions}
+            value={selectedOption}
+            onChange={(opt: any) => {
+              if (!opt || !settings?.jwtToken) return;
+              const newId = parseInt(opt.value, 10);
+              setSelectedTeamId(newId);
+              loadTeamData(newId, settings.jwtToken);
+            }}
           />
         )}
-        {scores.length > 0 && (
-          <Stack space="space.100">
-            <Text><Strong>Como interpretar</Strong></Text>
-            <Text>Média ≥ 4 — time saudável, alto índice de segurança psicológica.</Text>
-            <Text>Média entre 3 e 4 — nível moderado. Monitore a tendência nos próximos sprints.</Text>
-            <Text>Média &lt; 3 — sinal de alerta. O time pode não se sentir seguro para arriscar, discordar ou pedir ajuda. Considere uma retrospectiva focada em segurança psicológica.</Text>
-            <Text>Tendência entre sprints — média subindo indica que intervenções estão funcionando; média caindo indica que algo aconteceu no time.</Text>
+        <Text><Strong>Segurança Psicológica — Histórico por Sprint</Strong></Text>
+        <Text>Pontuação de 1 a 5 · itens reversos já ajustados · médias anônimas do time.</Text>
+        {!sprintLoaded ? (
+          <Text>Carregando dados do time...</Text>
+        ) : (
+          <Stack space="space.200">
+            {scores.length === 0 ? (
+              <SectionMessage title="Sem dados ainda" appearance="information" actions={[]} testId="sm-empty">
+                <Text>Nenhuma resposta registrada. O questionário é enviado automaticamente ao time quando um sprint é encerrado.</Text>
+              </SectionMessage>
+            ) : (
+              <DynamicTable
+                head={PS_REPORT_HEAD}
+                rows={scores.map((s: any) => ({
+                  key: `sprint-${s.sprint_number}`,
+                  cells: [
+                    { key: 'sprint', content: s.sprint_name ?? `Sprint ${s.sprint_number}` },
+                    { key: 'responses', content: String(s.response_count) },
+                    { key: 'mean', content: s.mean_score.toFixed(2) },
+                    { key: 'status', content: psLozenge(s.mean_score) },
+                  ],
+                }))}
+              />
+            )}
+            {scores.length > 0 && (
+              <Stack space="space.100">
+                <Text><Strong>Como interpretar</Strong></Text>
+                <Text>Média ≥ 4 — time saudável, alto índice de segurança psicológica.</Text>
+                <Text>Média entre 3 e 4 — nível moderado. Monitore a tendência nos próximos sprints.</Text>
+                <Text>Média &lt; 3 — sinal de alerta. O time pode não se sentir seguro para arriscar, discordar ou pedir ajuda. Considere uma retrospectiva focada em segurança psicológica.</Text>
+                <Text>Tendência entre sprints — média subindo indica que intervenções estão funcionando; média caindo indica que algo aconteceu no time.</Text>
+              </Stack>
+            )}
+            {(submitted || sprintState?.status === 'answered') ? (
+              <SectionMessage title="Obrigado pela sua resposta!" appearance="confirmation" actions={[]} testId="sm-done-mgr">
+                <Text>Sua resposta foi registrada anonimamente.</Text>
+              </SectionMessage>
+            ) : report?.error === 'session_expired' ? (
+              <SectionMessage title="Sessão expirada. Desconecte e reconecte nas Configurações." appearance="error" actions={[]} testId="sm-session-mgr">
+                <Text> </Text>
+              </SectionMessage>
+            ) : sprintState?.status === 'expired' ? (
+              <SectionMessage title="Questionário expirado" appearance="error" actions={[]} testId="sm-exp-mgr">
+                <Text>O prazo para responder este questionário encerrou.</Text>
+              </SectionMessage>
+            ) : sprintState?.sprint_token ? (
+              <Stack space="space.200">
+                <Text><Strong>Questionário — {sprintState.sprint_name ?? `Sprint ${sprintState.sprint_number}`}</Strong></Text>
+                <SectionMessage title="Respostas anônimas" appearance="information" actions={[]} testId="sm-anon-mgr">
+                  <Text>Suas respostas não são associadas ao seu nome. O time vê apenas médias.</Text>
+                </SectionMessage>
+                {error && (
+                  <SectionMessage title={error} appearance="error" actions={[]} testId="sm-err-mgr">
+                    <Text> </Text>
+                  </SectionMessage>
+                )}
+                {QUESTIONS.map((question, idx) => {
+                  const key = `q${idx + 1}`;
+                  return (
+                    <React.Fragment key={key}>
+                      <Stack space="space.100">
+                        <Text>{idx + 1}. {question}</Text>
+                        <Text>1 — Discordo totalmente &nbsp;·&nbsp; 5 — Concordo totalmente</Text>
+                        <Range name={key} min={1} max={5} step={1} value={answers[key]}
+                          onChange={(v: number) => setAnswers((prev) => ({ ...prev, [key]: v }))} />
+                        <Text>Resposta: <Strong>{answers[key]}</Strong></Text>
+                      </Stack>
+                      {idx < QUESTIONS.length - 1 && (
+                        <Box backgroundColor="color.border" paddingBlock="space.025" />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                <Button type="button" onClick={handleSubmit}>Enviar respostas</Button>
+              </Stack>
+            ) : null}
           </Stack>
         )}
       </Stack>
     );
   }
+
+  // Non-manager (employee) path
+  if (!sprintLoaded) return <Text>Carregando...</Text>;
 
   if (sprintState?.status === 'session_expired') {
     return (
@@ -170,26 +299,6 @@ export default function RF01PsQuestionnaire() {
       </SectionMessage>
     );
   }
-
-  const handleSubmit = async () => {
-    setError(null);
-    try {
-      await invoke('submitPsQuestionnaire', {
-        jwtToken: settings.jwtToken,
-        sprint_token: sprintState.sprint_token,
-        answers,
-      });
-      setSubmitted(true);
-    } catch (e: any) {
-      if (e.message?.includes('401')) {
-        setError('Sessão expirada. Reconecte nas Configurações.');
-      } else if (e.message?.includes('409')) {
-        setError('Você já respondeu este questionário.');
-      } else {
-        setError(`Erro ao enviar: ${e.message}`);
-      }
-    }
-  };
 
   return (
     <Stack space="space.200">

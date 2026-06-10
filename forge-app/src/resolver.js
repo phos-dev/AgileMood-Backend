@@ -64,6 +64,16 @@ resolver.define('getMyTeam', async ({ payload }) => {
   return { teamId: teams[0].id, teamName: teams[0].name };
 });
 
+resolver.define('getMyTeams', async ({ payload }) => {
+  const { jwtToken } = payload;
+  const resp = await api.fetch(`${API_URL}/teams/`, {
+    headers: { Authorization: `Bearer ${jwtToken}` },
+  });
+  if (!resp.ok) throw new Error(`${resp.status}`);
+  const data = await resp.json();
+  return (Array.isArray(data) ? data : data.teams ?? []).map(t => ({ id: t.id, name: t.name }));
+});
+
 resolver.define('getEmotions', async ({ payload }) => {
   const { teamId } = payload;
   const resp = await api.fetch(`${API_URL}/emotions/public?team_id=${teamId}`);
@@ -81,20 +91,11 @@ resolver.define('registerEmotion', async ({ payload }) => {
     is_anonymous: isAnonymous,
   });
 
-  let resp;
-  if (isAnonymous) {
-    resp = await api.fetch(`${API_URL}/emotion_record/public?team_id=${teamId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-  } else {
-    resp = await api.fetch(`${API_URL}/emotion_record/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwtToken}` },
-      body,
-    });
-  }
+  const resp = await api.fetch(`${API_URL}/emotion_record/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwtToken}` },
+    body,
+  });
   if (!resp.ok) throw new Error(`${resp.status}`);
   return { success: true };
 });
@@ -178,8 +179,15 @@ resolver.define('connectProject', async ({ payload, context }) => {
   return { success: true, boardId };
 });
 
-resolver.define('disconnectJira', async ({ payload }) => {
+resolver.define('disconnectJira', async ({ payload, context }) => {
   const { teamId, jwtToken } = payload;
+
+  const projectId = context.extension?.project?.id;
+  if (projectId) {
+    const boardId = await _getBoardId(projectId);
+    if (boardId) await storage.delete(`agilemood-board-${boardId}`);
+  }
+
   const resp = await api.fetch(`${API_URL}/integrations/jira/disconnect?team_id=${teamId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${jwtToken}` },

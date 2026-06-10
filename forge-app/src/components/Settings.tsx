@@ -7,12 +7,14 @@ import {
   Textfield as RawTextfield,
   Button,
   Form as RawForm,
+  Select as RawSelect,
 } from '@forge/react';
 const Strong = RawStrong as any;
 const Stack = RawStack as any;
 const SectionMessage = RawSectionMessage as any;
 const Textfield = RawTextfield as any;
 const Form = RawForm as any;
+const Select = RawSelect as any;
 import { invoke } from '@forge/bridge';
 
 interface SettingsProps {
@@ -26,13 +28,21 @@ export default function Settings({ onLogin }: SettingsProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [projectStatus, setProjectStatus] = useState<any>(null);
+  const [teams, setTeams] = useState<{ id: number; name: string }[]>([]);
+  const [connectingTeam, setConnectingTeam] = useState(false);
 
   useEffect(() => {
     invoke<any>('getSettings').then((s: any) => {
       if (s?.jwtToken) {
         setSettings(s);
         if (s.role === 'manager') {
-          invoke<any>('getProjectStatus').then(setProjectStatus);
+          Promise.all([
+            invoke<any>('getProjectStatus'),
+            invoke<any>('getMyTeams', { jwtToken: s.jwtToken }).catch(() => []),
+          ]).then(([status, allTeams]: any[]) => {
+            setProjectStatus(status);
+            setTeams(allTeams);
+          });
         }
       }
     });
@@ -80,7 +90,7 @@ export default function Settings({ onLogin }: SettingsProps) {
   };
 
   const handleDisconnect = async () => {
-    await invoke('saveSettings', null);
+    await invoke('saveSettings', undefined);
     setSettings(null);
     setEmail('');
     setPassword('');
@@ -89,14 +99,18 @@ export default function Settings({ onLogin }: SettingsProps) {
 
   if (settings?.jwtToken) {
     const roleLabel = settings.role === 'manager' ? 'Gestor' : 'Funcionário';
-    const teamDisplay = settings.teamName || (settings.teamId ? String(settings.teamId) : null);
+    const connectedTeamName = teams.find(t => t.id === projectStatus?.teamId)?.name;
+    const teamDisplay = connectedTeamName || settings.teamName || (settings.teamId ? String(settings.teamId) : null);
+    const teamOptions = teams.map(t => ({ label: t.name, value: String(t.id) }));
+    const selectedTeamOption = teamOptions.find(o => o.value === String(projectStatus?.teamId)) ?? null;
+
     return (
       <Stack space="space.200">
-          <SectionMessage title="Conectado" appearance="confirmation" actions={[]} testId="sm-ok">
+        <SectionMessage title="Conectado" appearance="confirmation" actions={[]} testId="sm-ok">
           <Text>{settings.name || settings.email} — <Strong>{roleLabel}</Strong></Text>
-          <Text>Equipe: {teamDisplay ?? '—'}</Text>
+          {settings.role === 'manager' && <Text>Equipe: {teamDisplay ?? '—'}</Text>}
         </SectionMessage>
-        {!settings.teamId && (
+        {!settings.teamId && settings.role !== 'manager' && (
           <SectionMessage title="Equipe não encontrada" appearance="warning" actions={[]} testId="sm-noteam">
             <Text>Verifique sua conta no AgileMood — você precisa estar associado a uma equipe.</Text>
           </SectionMessage>
@@ -107,11 +121,30 @@ export default function Settings({ onLogin }: SettingsProps) {
                 <SectionMessage title="Integração Jira ativa" appearance="confirmation" actions={[]} testId="sm-jira-ok">
                   <Text>Sprints detectados automaticamente ao encerrar no Jira.</Text>
                 </SectionMessage>
+                {teams.length > 1 && (
+                  <Stack space="space.100">
+                    <Text><Strong>Time vinculado a este projeto:</Strong></Text>
+                    <Select
+                      name="project-team"
+                      options={teamOptions}
+                      value={selectedTeamOption}
+                      onChange={async (opt: any) => {
+                        if (!opt || connectingTeam) return;
+                        setConnectingTeam(true);
+                        const newTeamId = parseInt(opt.value, 10);
+                        await invoke('connectProject', { teamId: newTeamId });
+                        setProjectStatus((prev: any) => ({ ...prev, teamId: newTeamId }));
+                        setConnectingTeam(false);
+                      }}
+                    />
+                    {connectingTeam && <Text>Atualizando...</Text>}
+                  </Stack>
+                )}
                 <SectionMessage title="Desconectar integração" appearance="warning" actions={[]} testId="sm-jira-disconnect-info">
                   <Text>Ao desconectar, sprints futuros não serão mais detectados automaticamente e o questionário de Segurança Psicológica não será acionado. Os dados históricos já registados são preservados.</Text>
                 </SectionMessage>
                 <Button type="button" onClick={async () => {
-                  await invoke('disconnectJira', { teamId: settings.teamId, jwtToken: settings.jwtToken });
+                  await invoke('disconnectJira', { teamId: projectStatus.teamId, jwtToken: settings.jwtToken });
                   setProjectStatus({ connected: false, teamId: null });
                 }}>Desconectar integração Jira</Button>
               </Stack>
@@ -119,9 +152,24 @@ export default function Settings({ onLogin }: SettingsProps) {
                 <SectionMessage title="Jira não conectado" appearance="warning" actions={[]} testId="sm-jira-warn">
                   <Text>Conecte este projeto para detectar sprints automaticamente.</Text>
                 </SectionMessage>
+                {teams.length > 1 && (
+                  <Stack space="space.100">
+                    <Text><Strong>Time a vincular:</Strong></Text>
+                    <Select
+                      name="project-team-connect"
+                      options={teamOptions}
+                      value={selectedTeamOption}
+                      onChange={(opt: any) => {
+                        if (!opt) return;
+                        setProjectStatus((prev: any) => ({ ...prev, teamId: parseInt(opt.value, 10) }));
+                      }}
+                    />
+                  </Stack>
+                )}
                 <Button type="button" onClick={async () => {
-                  await invoke('connectProject', { teamId: settings.teamId });
-                  setProjectStatus({ connected: true, teamId: settings.teamId });
+                  const teamIdToConnect = projectStatus?.teamId ?? settings.teamId;
+                  await invoke('connectProject', { teamId: teamIdToConnect });
+                  setProjectStatus({ connected: true, teamId: teamIdToConnect });
                 }}>Conectar este projeto</Button>
               </Stack>
         )}

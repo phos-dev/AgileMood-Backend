@@ -55,12 +55,23 @@ export default function RF07Messages() {
 
   if (messages.length === 0) return <Text>Nenhuma mensagem recebida ainda.</Text>;
 
-  const head = { cells: [{ key: 'date', content: 'Data' }, { key: 'msg', content: 'Mensagem' }] };
+  const head = {
+    cells: [
+      { key: 'emotion', content: 'Emoção' },
+      { key: 'intensity', content: 'Intensidade' },
+      { key: 'note', content: 'Nota' },
+      { key: 'msg', content: 'Feedback do Gestor' },
+      { key: 'date', content: 'Data' },
+    ],
+  };
   const rows = messages.map((msg, i) => ({
     key: String(i),
     cells: [
-      { content: new Date(msg.created_at).toLocaleDateString('pt-BR') },
+      { content: msg.emotion_name ?? '—' },
+      { content: msg.emotion_intensity ? `${msg.emotion_intensity}/5` : '—' },
+      { content: msg.emotion_notes ?? '—' },
       { content: msg.content || msg.message || '' },
+      { content: new Date(msg.created_at).toLocaleDateString('pt-BR') },
     ],
   }));
 

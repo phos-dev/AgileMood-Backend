@@ -27,6 +27,9 @@ class FeedbackInDb(FeedbackBase):
 
 class FeedbackResponse(FeedbackInDb):
     manager_knows_identity: bool = False
+    emotion_name: Optional[str] = None
+    emotion_notes: Optional[str] = None
+    emotion_intensity: Optional[int] = None
 
 
 class AllFeedbacksResponse(BaseModel):

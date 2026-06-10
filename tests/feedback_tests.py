@@ -1,7 +1,8 @@
 import uuid
 import pytest
-from app.crud import feedback_crud
+from app.crud import feedback_crud, emotion_record_crud
 from app.schemas.emotion_record_schema import Emotion, EmotionRecord
+from app.schemas.feedback_schema import Feedback
 from app.schemas.team_schema import Team as TeamORM, user_teams as user_teams_table
 from app.schemas.user_schema import User as UserORM
 from app.crud.user_crud import get_password_hash
@@ -137,6 +138,50 @@ def test_other_manager_cannot_send_feedback(db, employee, emotion, emotion_recor
 def test_nonexistent_emotion_record_returns_false(db, manager):
     result = feedback_crud.can_manager_send_feedback(db, manager.id, 9999999)
     assert result is False
+
+
+def test_anonymous_record_with_user_id_appears_in_team_listing(db, employee, anonymous_emotion_record, team, emotion):
+    """
+    After the resolver fix, anonymous records store user_id.
+    The team listing query (for_team=True) must find them via user_id.in_()
+    and must NOT produce ghost entries (user_id=None in the raw query).
+    """
+    results = emotion_record_crud.get_emotion_records_by_user_id(
+        db, [employee.id], for_team=True, team_id=team.id
+    )
+
+    ids = [r.id for r in results]
+    assert anonymous_emotion_record.id in ids
+
+    # identity masked in response even though DB has real user_id
+    anon_result = next(r for r in results if r.id == anonymous_emotion_record.id)
+    assert anon_result.user_id is None
+    assert anon_result.is_anonymous is True
+
+
+def test_employee_sees_feedback_on_anonymous_emotion_record(db, manager, anonymous_emotion_record):
+    """
+    Regression: anonymous records now store user_id, so employee must see manager replies.
+    Before the fix, user_id was NULL → get_feedbacks_by_user_id returned nothing.
+    """
+    feedback = Feedback(
+        message="Keep it up!",
+        emotion_record_id=anonymous_emotion_record.id,
+        manager_id=manager.id,
+        is_anonymous=False,
+    )
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+
+    results = feedback_crud.get_feedbacks_by_user_id(db, anonymous_emotion_record.user_id)
+
+    db.delete(feedback)
+    db.commit()
+
+    assert len(results) == 1
+    assert results[0].id == feedback.id
+    assert results[0].manager_knows_identity is False
 
 
 def test_manager_without_user_teams_row_can_still_send_feedback(db, manager, emotion_record):

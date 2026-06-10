@@ -36,17 +36,13 @@ def get_emotion_records_by_user_id(
 ):
     # Se for para team e team_id for fornecido, filtra por emoções do time específico
     if for_team and team_id is not None:
-        from sqlalchemy import or_
         from app.schemas.emotion_record_schema import Emotion
         emotion_records = (
             db.query(EmotionRecordSchema)
             .join(Emotion, EmotionRecordSchema.emotion_id == Emotion.id)
             .filter(
-                or_(
-                    EmotionRecordSchema.user_id.in_(users_id),
-                    EmotionRecordSchema.user_id.is_(None),
-                ),
-                Emotion.team_id == team_id
+                EmotionRecordSchema.user_id.in_(users_id),
+                Emotion.team_id == team_id,
             )
             .all()
         )
