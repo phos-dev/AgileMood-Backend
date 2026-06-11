@@ -87,31 +87,31 @@ export default function RF01PsQuestionnaire() {
       if (!s?.jwtToken) { setSprintLoaded(true); return; }
 
       const projectStatus = await invoke<any>('getProjectStatus').catch(() => null);
-      const effectiveTeamId = projectStatus?.teamId ?? s.teamId ?? null;
 
       if (s.role === 'manager') {
         invoke<any>('getMyTeams', { jwtToken: s.jwtToken })
           .then((allTeams: { id: number; name: string }[]) => {
             setTeams(allTeams);
-            const initialId = effectiveTeamId ?? allTeams[0]?.id ?? null;
-            if (initialId) {
-              setSelectedTeamId(initialId);
-              loadTeamData(initialId, s.jwtToken);
-            } else {
-              setSprintLoaded(true);
-            }
-          })
-          .catch(() => {
+            const myTeamIds = allTeams.map(t => t.id);
+            const projectTeamId = projectStatus?.teamId ?? null;
+            const effectiveTeamId =
+              (projectTeamId && myTeamIds.includes(projectTeamId))
+                ? projectTeamId
+                : (allTeams[0]?.id ?? null);
             if (effectiveTeamId) {
               setSelectedTeamId(effectiveTeamId);
               loadTeamData(effectiveTeamId, s.jwtToken);
             } else {
               setSprintLoaded(true);
             }
+          })
+          .catch(() => {
+            setSprintLoaded(true);
           });
       } else {
-        if (!effectiveTeamId) { setSprintLoaded(true); return; }
-        invoke<any>('getSprintToken', { teamId: effectiveTeamId, jwtToken: s.jwtToken })
+        const teamId = s.teamId ?? null;
+        if (!teamId) { setSprintLoaded(true); return; }
+        invoke<any>('getSprintToken', { teamId, jwtToken: s.jwtToken })
           .then((state: any) => { setSprintState(state); setSprintLoaded(true); })
           .catch(() => { setSprintState({ status: 'no_active_sprint' }); setSprintLoaded(true); });
       }
@@ -163,7 +163,7 @@ export default function RF01PsQuestionnaire() {
 
     return (
       <Stack space="space.200">
-        {teams.length > 1 && (
+        {teams.length > 0 && (
           <Select
             name="team-select"
             options={teamOptions}

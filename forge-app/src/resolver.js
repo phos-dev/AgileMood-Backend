@@ -175,7 +175,9 @@ resolver.define('connectProject', async ({ payload, context }) => {
   const boardId = await _getBoardId(projectId);
   console.log('[AgileMood] connectProject saving boardId:', boardId);
   if (!boardId) return { success: false, error: 'board_not_found' };
-  await storage.set(`agilemood-board-${boardId}`, { teamId });
+  const userKey = `agilemood-board-${boardId}-account-${context.accountId}`;
+  await storage.set(userKey, { teamId });
+  await storage.set(`agilemood-board-${boardId}`, { teamId }); // used by sprint triggers
   return { success: true, boardId };
 });
 
@@ -185,14 +187,16 @@ resolver.define('disconnectJira', async ({ payload, context }) => {
   const projectId = context.extension?.project?.id;
   if (projectId) {
     const boardId = await _getBoardId(projectId);
-    if (boardId) await storage.delete(`agilemood-board-${boardId}`);
+    if (boardId) {
+      await storage.delete(`agilemood-board-${boardId}-account-${context.accountId}`);
+    }
   }
 
   const resp = await api.fetch(`${API_URL}/integrations/jira/disconnect?team_id=${teamId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${jwtToken}` },
   });
-  if (!resp.ok) throw new Error(`${resp.status}`);
+  if (!resp.ok && resp.status !== 403 && resp.status !== 404) throw new Error(`${resp.status}`);
   return { success: true };
 });
 
@@ -200,7 +204,8 @@ resolver.define('getProjectStatus', async ({ context }) => {
   const projectId = context.extension?.project?.id;
   const boardId = await _getBoardId(projectId);
   if (!boardId) return { connected: false, teamId: null };
-  const s = await storage.get(`agilemood-board-${boardId}`);
+  const userKey = `agilemood-board-${boardId}-account-${context.accountId}`;
+  const s = await storage.get(userKey);
   return { connected: !!(s?.teamId), teamId: s?.teamId ?? null };
 });
 

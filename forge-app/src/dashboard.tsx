@@ -10,11 +10,14 @@ import Settings from './components/Settings';
 const App = () => {
   const [settings, setSettings] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
+  const [settingsKey, setSettingsKey] = useState(0);
+  const [tabsKey, setTabsKey] = useState(0);
 
   const reload = () =>
     invoke<any>('getSettings').then((s: any) => {
       setSettings(s);
       setLoaded(true);
+      setTabsKey(k => k + 1);
     });
 
   useEffect(() => { reload(); }, []);
@@ -23,8 +26,15 @@ const App = () => {
 
   const role = settings?.role;
 
+  const settingsTabIndex =
+    (role === 'manager' ? 1 : 0) +
+    (role === 'employee' ? 2 : 0) +
+    (settings?.jwtToken ? 1 : 0);
+
   return (
-    <Tabs id="agilemood-tabs">
+    <Tabs key={tabsKey} id="agilemood-tabs" onChange={(index: number) => {
+      if (index === settingsTabIndex) setSettingsKey(k => k + 1);
+    }}>
       <TabList>
         {role === 'manager' && <Tab>Dashboard - Humor da Equipe</Tab>}
         {role === 'employee' && <Tab>Registrar Sentimento</Tab>}
@@ -67,7 +77,7 @@ const App = () => {
       
       <TabPanel>
         <Box paddingBlockStart="space.200">
-          <Settings onLogin={reload} />
+          <Settings onLogin={reload} refreshKey={settingsKey} />
         </Box>
       </TabPanel>
     </Tabs>

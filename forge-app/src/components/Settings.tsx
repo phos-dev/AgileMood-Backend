@@ -19,9 +19,10 @@ import { invoke } from '@forge/bridge';
 
 interface SettingsProps {
   onLogin?: () => void;
+  refreshKey?: number;
 }
 
-export default function Settings({ onLogin }: SettingsProps) {
+export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
   const [settings, setSettings] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -40,13 +41,17 @@ export default function Settings({ onLogin }: SettingsProps) {
             invoke<any>('getProjectStatus'),
             invoke<any>('getMyTeams', { jwtToken: s.jwtToken }).catch(() => []),
           ]).then(([status, allTeams]: any[]) => {
-            setProjectStatus(status);
             setTeams(allTeams);
+            if (allTeams.length > 0 && status?.teamId) {
+              const teamName = allTeams.find((t: any) => t.id === status.teamId)?.name ?? '';
+              if (teamName) setSettings((prev: any) => ({ ...prev, teamName }));
+            }
+            setProjectStatus(status ?? { connected: false, teamId: null });
           });
         }
       }
     });
-  }, []);
+  }, [refreshKey]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -76,8 +81,13 @@ export default function Settings({ onLogin }: SettingsProps) {
       };
       await invoke('saveSettings', newSettings);
       if (data.role === 'manager' && teamId) {
-        await invoke('connectProject', { teamId });
-        setProjectStatus({ connected: true, teamId });
+        const existingStatus = await invoke<any>('getProjectStatus').catch(() => null);
+        if (!existingStatus?.connected) {
+          await invoke('connectProject', { teamId });
+          setProjectStatus({ connected: true, teamId });
+        } else {
+          setProjectStatus(existingStatus);
+        }
       }
       setSettings(newSettings);
       setPassword('');
@@ -92,6 +102,8 @@ export default function Settings({ onLogin }: SettingsProps) {
   const handleDisconnect = async () => {
     await invoke('saveSettings', undefined);
     setSettings(null);
+    setTeams([]);
+    setProjectStatus(null);
     setEmail('');
     setPassword('');
     onLogin?.();
@@ -108,7 +120,7 @@ export default function Settings({ onLogin }: SettingsProps) {
       <Stack space="space.200">
         <SectionMessage title="Conectado" appearance="confirmation" actions={[]} testId="sm-ok">
           <Text>{settings.name || settings.email} — <Strong>{roleLabel}</Strong></Text>
-          {settings.role === 'manager' && <Text>Equipe: {teamDisplay ?? '—'}</Text>}
+          <Text>Equipe: {teamDisplay ?? '—'}</Text>
         </SectionMessage>
         {!settings.teamId && settings.role !== 'manager' && (
           <SectionMessage title="Equipe não encontrada" appearance="warning" actions={[]} testId="sm-noteam">
@@ -121,7 +133,7 @@ export default function Settings({ onLogin }: SettingsProps) {
                 <SectionMessage title="Integração Jira ativa" appearance="confirmation" actions={[]} testId="sm-jira-ok">
                   <Text>Sprints detectados automaticamente ao encerrar no Jira.</Text>
                 </SectionMessage>
-                {teams.length > 1 && (
+                {teams.length > 0 && (
                   <Stack space="space.100">
                     <Text><Strong>Time vinculado a este projeto:</Strong></Text>
                     <Select
@@ -144,7 +156,9 @@ export default function Settings({ onLogin }: SettingsProps) {
                   <Text>Ao desconectar, sprints futuros não serão mais detectados automaticamente e o questionário de Segurança Psicológica não será acionado. Os dados históricos já registados são preservados.</Text>
                 </SectionMessage>
                 <Button type="button" onClick={async () => {
-                  await invoke('disconnectJira', { teamId: projectStatus.teamId, jwtToken: settings.jwtToken });
+                  try {
+                    await invoke('disconnectJira', { teamId: projectStatus.teamId, jwtToken: settings.jwtToken });
+                  } catch (_) { /* already disconnected or backend error — proceed anyway */ }
                   setProjectStatus({ connected: false, teamId: null });
                 }}>Desconectar integração Jira</Button>
               </Stack>
@@ -152,7 +166,7 @@ export default function Settings({ onLogin }: SettingsProps) {
                 <SectionMessage title="Jira não conectado" appearance="warning" actions={[]} testId="sm-jira-warn">
                   <Text>Conecte este projeto para detectar sprints automaticamente.</Text>
                 </SectionMessage>
-                {teams.length > 1 && (
+                {teams.length > 0 && (
                   <Stack space="space.100">
                     <Text><Strong>Time a vincular:</Strong></Text>
                     <Select
