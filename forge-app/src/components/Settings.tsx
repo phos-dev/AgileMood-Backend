@@ -85,8 +85,8 @@ export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
       if (data.role === 'manager' && teamId) {
         const existingStatus = await invoke<any>('getProjectStatus').catch(() => null);
         if (!existingStatus?.connected) {
-          await invoke('connectProject', { teamId });
-          setProjectStatus({ connected: true, teamId });
+          const connectResult = await invoke<any>('connectProject', { teamId });
+          setProjectStatus({ connected: true, teamId, boardId: connectResult?.boardId });
         } else {
           setProjectStatus(existingStatus);
         }
@@ -146,8 +146,8 @@ export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
                         if (!opt || connectingTeam) return;
                         setConnectingTeam(true);
                         const newTeamId = parseInt(opt.value, 10);
-                        await invoke('connectProject', { teamId: newTeamId });
-                        setProjectStatus((prev: any) => ({ ...prev, teamId: newTeamId }));
+                        const connectResult = await invoke<any>('connectProject', { teamId: newTeamId });
+                        setProjectStatus((prev: any) => ({ ...prev, teamId: newTeamId, boardId: connectResult?.boardId ?? prev?.boardId }));
                         setConnectingTeam(false);
                       }}
                     />
@@ -159,7 +159,7 @@ export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
                 </SectionMessage>
                 <Button type="button" onClick={async () => {
                   try {
-                    await invoke('disconnectJira', { teamId: projectStatus.teamId, jwtToken: settings.jwtToken });
+                    await invoke('disconnectJira', { teamId: projectStatus.teamId, jwtToken: settings.jwtToken, boardId: projectStatus.boardId });
                   } catch (_) { /* already disconnected or backend error — proceed anyway */ }
                   setProjectStatus({ connected: false, teamId: null });
                 }}>Desconectar integração Jira</Button>
@@ -184,8 +184,8 @@ export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
                 )}
                 <Button type="button" onClick={async () => {
                   const teamIdToConnect = projectStatus?.teamId ?? settings.teamId;
-                  await invoke('connectProject', { teamId: teamIdToConnect });
-                  setProjectStatus({ connected: true, teamId: teamIdToConnect });
+                  const connectResult = await invoke<any>('connectProject', { teamId: teamIdToConnect });
+                  setProjectStatus({ connected: true, teamId: teamIdToConnect, boardId: connectResult?.boardId });
                 }}>Conectar este projeto</Button>
               </Stack>
         )}
