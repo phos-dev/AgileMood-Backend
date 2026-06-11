@@ -84,11 +84,11 @@ export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
       await invoke('saveSettings', newSettings);
       if (data.role === 'manager' && teamId) {
         const existingStatus = await invoke<any>('getProjectStatus').catch(() => null);
-        if (!existingStatus?.connected && !existingStatus?.disconnected) {
+        if (!existingStatus?.connected) {
           const connectResult = await invoke<any>('connectProject', { teamId });
           setProjectStatus({ connected: true, teamId, boardId: connectResult?.boardId });
         } else {
-          setProjectStatus(existingStatus ?? { connected: false, teamId: null, boardId: null });
+          setProjectStatus(existingStatus);
         }
       }
       setSettings(newSettings);

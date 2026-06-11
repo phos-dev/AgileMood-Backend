@@ -185,7 +185,7 @@ resolver.define('disconnectJira', async ({ payload, context }) => {
   const { teamId, jwtToken, boardId } = payload;
   if (boardId) {
     const userKey = `agilemood-board-${boardId}-account-${context.accountId}`;
-    await storage.set(userKey, { teamId: null, disconnected: true });
+    await storage.set(userKey, { teamId: null });
   }
   const resp = await api.fetch(`${API_URL}/integrations/jira/disconnect?team_id=${teamId}`, {
     method: 'DELETE',
@@ -201,7 +201,7 @@ resolver.define('getProjectStatus', async ({ context }) => {
   if (!boardId) return { connected: false, teamId: null, boardId: null };
   const userKey = `agilemood-board-${boardId}-account-${context.accountId}`;
   const s = await storage.get(userKey);
-  return { connected: !!(s?.teamId), teamId: s?.teamId ?? null, boardId, disconnected: s?.disconnected ?? false };
+  return { connected: !!(s?.teamId), teamId: s?.teamId ?? null, boardId };
 });
 
 export const handler = resolver.getDefinitions();
