@@ -18,6 +18,7 @@ const App = () => {
       setSettings(s);
       setLoaded(true);
       setTabsKey(k => k + 1);
+    setSettingsKey(k => k + 1);
     });
 
   useEffect(() => { reload(); }, []);

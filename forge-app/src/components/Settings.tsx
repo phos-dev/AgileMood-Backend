@@ -33,6 +33,8 @@ export default function Settings({ onLogin, refreshKey = 0 }: SettingsProps) {
   const [connectingTeam, setConnectingTeam] = useState(false);
 
   useEffect(() => {
+    setTeams([]);
+    setProjectStatus(null);
     invoke<any>('getSettings').then((s: any) => {
       if (s?.jwtToken) {
         setSettings(s);
