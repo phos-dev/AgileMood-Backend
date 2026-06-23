@@ -41,3 +41,4 @@ psycopg2-binary==2.9.9
 APScheduler==3.10.4
 alembic==1.14.0
 slowapi==0.1.9
+resend==2.32.2
