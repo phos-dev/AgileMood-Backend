@@ -13,7 +13,7 @@ from app.models.user_model import UserInDB
 from app.models.token_model import TokenData
 
 from app.databases.postgres_database import get_db
-from app.utils.constants import Errors, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.utils.constants import Errors, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, RESET_TOKEN_EXPIRE_MINUTES
 from app.utils.logger import logger
 
 
@@ -62,6 +62,27 @@ async def get_current_active_user(current_user: Annotated[UserInDB, Depends(get_
     if current_user.disabled:
         raise Errors.INACTIVE_USER
     return current_user
+
+
+def create_reset_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": email, "purpose": "password_reset", "exp": expire}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_reset_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "password_reset":
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        return email
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Reset token expired")
+    except InvalidTokenError:
+        raise HTTPException(status_code=400, detail="Invalid reset token")
 
 
 SPRINT_TOKEN_EXPIRE_HOURS = 48

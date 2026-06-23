@@ -45,3 +45,8 @@ class Role:
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 240
+
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+RESET_PASSWORD_BASE_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+RESET_TOKEN_EXPIRE_MINUTES = 15

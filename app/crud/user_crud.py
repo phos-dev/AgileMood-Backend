@@ -94,6 +94,16 @@ def update_teams_user_id(db: Session, user_id: int, teams_user_id: str | None):
     return user
 
 
+def reset_password(db: Session, user_id: int, new_password: str):
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        return None
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def delete_user(db: Session, user_id: int):
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     db.delete(user)

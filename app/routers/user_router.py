@@ -9,7 +9,10 @@ from app.routers.authentication import (
     authenticate_user,
     create_access_token,
     get_current_active_user,
+    create_reset_token,
+    verify_reset_token,
 )
+from app.services import email_service
 
 from app.services.report_scheduler import send_weekly_reports, send_weekly_reminders, send_weekly_teams_reports, send_weekly_teams_reminders
 from app.models.user_model import UserCreate, UserInDB, UserInTeam
@@ -36,6 +39,34 @@ async def trigger_reports_now(background_tasks: BackgroundTasks):
 async def trigger_reminders_now(background_tasks: BackgroundTasks):
     background_tasks.add_task(send_weekly_reminders)
     return {"message": "Weekly reminders triggered in the background!"}
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordByTokenRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = user_crud.get_user_by_email(db, body.email)
+    if user:
+        token = create_reset_token(body.email)
+        email_service.send_password_reset_email(body.email, token)
+    return {"message": "If the email exists, a reset link has been sent"}
+
+
+@router.post("/reset-password-by-token")
+def reset_password_by_token(body: ResetPasswordByTokenRequest, db: Session = Depends(get_db)):
+    email = verify_reset_token(body.token)
+    user = user_crud.get_user_by_email(db, email)
+    if user is None:
+        raise Errors.NOT_FOUND
+    user_crud.reset_password(db, user.id, body.new_password)
+    return {"message": "Password reset successfully"}
+
 
 @router.post("/login", response_model=Token)
 def login(
@@ -111,6 +142,25 @@ def update_user_by_id(
         raise Errors.INVALID_PARAMS
 
     return updated_user
+
+
+class PasswordReset(BaseModel):
+    new_password: str
+
+
+@router.post("/{user_id}/reset-password", response_model=UserInDB)
+def reset_user_password(
+    user_id: int,
+    body: PasswordReset,
+    current_user: Annotated[UserInDB, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+):
+    if current_user.role != Role.MANAGER:
+        raise Errors.NO_PERMISSION
+    updated = user_crud.reset_password(db, user_id, body.new_password)
+    if updated is None:
+        raise Errors.NOT_FOUND
+    return updated
 
 
 @router.delete("/{user_id}")
